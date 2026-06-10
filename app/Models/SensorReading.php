@@ -13,6 +13,7 @@ class SensorReading extends Model
         'suhu',
         'kelembapan_udara',
         'kelembapan_tanah',
+        'nilai_fuzzy',
         'image',
         'deteksi'   
     ];

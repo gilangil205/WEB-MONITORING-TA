@@ -28,6 +28,13 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        // ── KONDISI PENGALIHAN BERDASARKAN ROLE ───────────────────────────
+        // Jika yang login adalah admin, PAKSA langsung ke route admin tanpa mengikuti intended URL lama
+        if ($request->user()->isAdmin()) {
+            return redirect()->route('admin.dashboard');
+        }
+
+        // Jika user biasa, biarkan menggunakan intended bawaan Breeze
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

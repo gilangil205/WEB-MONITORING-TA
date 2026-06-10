@@ -40,12 +40,14 @@ class RegisteredUserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'role' => 'user', // ← DIKUNCI: Semua yang daftar lewat web otomatis jadi user biasa
         ]);
 
         event(new Registered($user));
 
         Auth::login($user);
 
+        // Karena yang mendaftar pasti user biasa, langsung lempar ke dashboard biasa
         return redirect(route('dashboard', absolute: false));
     }
 }

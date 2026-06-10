@@ -152,6 +152,23 @@
             background:white;
         }
 
+        .bottom-link{
+            margin-top:22px;
+            text-align:center;
+            font-size:14px;
+            color:#cbd5e1;
+        }
+
+          .bottom-link a{
+            color:#4ade80;
+            text-decoration:none;
+            font-weight:700;
+        }
+
+        .bottom-link a:hover{
+            text-decoration:underline;
+        }
+        
         .remember{
             display:flex;
             align-items:center;
@@ -336,9 +353,12 @@
 
             </form>
 
-            <div class="footer-text">
-                SmartFarm Monitoring System © {{ date('Y') }}
-            </div>
+            <div class="bottom-link">
+                    belum punya akun??
+                    <a href="{{ route('register') }}">
+                        Daftar di sini
+                    </a>
+                </div>
 
         </div>
 
