@@ -17,7 +17,6 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/dashboard', [SensorController::class, 'index'])->name('dashboard');
-    Route::get('/monitoring', [SensorController::class, 'monitoring'])->name('monitoring');
     Route::get('/prediksi',   [SensorController::class, 'prediksi'])->name('prediksi');
     Route::get('/riwayat',    [SensorController::class, 'riwayat'])->name('riwayat');
     Route::get('/kamera',     [SensorController::class, 'kamera'])->name('kamera');

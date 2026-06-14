@@ -1,14 +1,9 @@
-{{-- ============================================================ --}}
-{{-- FILE 10: resources/views/admin/dashboard.blade.php  (FILE BARU) --}}
-{{-- ============================================================ --}}
 @extends('layouts.app')
 
 @section('title', 'Panel Admin')
 
 @section('content')
 <style>
-/* ── KHUSUS HALAMAN ADMIN ─────────────────────────────────────── */
-
 .admin-badge {
     display:inline-flex; align-items:center; gap:6px;
     background:linear-gradient(135deg,#7c3aed,#6d28d9);
@@ -24,37 +19,39 @@
 .stat-label { font-size:11px; color:var(--abu); font-weight:500; margin-top:2px; }
 
 /* Layout dua kolom */
-.admin-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.admin-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:20px; align-items:start; }
 
-/* Form input */
-.form-group { margin-bottom:16px; }
-.form-group:last-child { margin-bottom:0; }
-.form-label { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
-.form-label span { font-size:13px; font-weight:600; color:var(--teks2); }
-.form-range-hint { font-size:11px; color:var(--abu); font-family:var(--mono); }
-.form-input {
+/* ── Kartu parameter (Suhu / Udara / Tanah) ── */
+.param-card { border:1px solid #e2e8f0; border-radius:12px; padding:18px 20px; margin-bottom:18px; }
+.param-card:last-of-type { margin-bottom:0; }
+.param-title { display:flex; align-items:center; gap:10px; font-size:15px; font-weight:700; color:var(--teks); margin-bottom:16px; }
+.param-title .pi { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:17px; }
+
+.minmax-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px; }
+.minmax-label { font-size:13px; font-weight:600; color:var(--teks2); margin-bottom:6px; display:block; }
+.minmax-input {
     width:100%; padding:10px 12px; border:1.5px solid #e2e8f0; border-radius:8px;
     font-size:14px; font-weight:600; font-family:var(--mono); color:var(--teks);
     background:#f8fafc; transition:border-color 0.15s, box-shadow 0.15s; outline:none;
 }
-.form-input:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,0.12); background:white; }
-.form-input-group { display:flex; align-items:center; gap:8px; }
-.form-satuan { font-size:13px; font-weight:600; color:var(--abu); min-width:20px; }
-.form-desc   { margin-top:4px; font-size:11px; color:#94a3b8; }
+.minmax-input:focus { border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,0.12); background:white; }
 
-/* Divider dalam panel */
-.form-divider { border:none; border-top:1px dashed #e2e8f0; margin:16px 0; }
-.form-section-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--abu); margin-bottom:12px; }
+/* Range bar dua titik */
+.range-row { position:relative; height:6px; background:#e2e8f0; border-radius:99px; margin:18px 0 6px; }
+.range-fill { position:absolute; top:0; height:100%; background:#22c55e; border-radius:99px; }
+.range-dot { position:absolute; top:50%; width:14px; height:14px; background:#16a34a; border:3px solid white; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 1px 4px rgba(0,0,0,0.25); }
+.range-scale { display:flex; justify-content:space-between; font-size:11px; color:var(--abu); font-family:var(--mono); }
+.range-optimal { text-align:center; font-size:12px; font-weight:700; color:#16a34a; margin-top:6px; }
 
 /* Tombol */
 .btn-primary {
     display:inline-flex; align-items:center; gap:8px;
-    background:linear-gradient(135deg,#7c3aed,#6d28d9); color:white;
+    background:linear-gradient(135deg,#16a34a,#15803d); color:white;
     border:none; padding:11px 24px; border-radius:10px; cursor:pointer;
     font-size:14px; font-weight:700; font-family:var(--font);
-    box-shadow:0 4px 12px rgba(124,58,237,0.3); transition:all 0.2s;
+    box-shadow:0 4px 12px rgba(22,163,74,0.3); transition:all 0.2s;
 }
-.btn-primary:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(124,58,237,0.4); }
+.btn-primary:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(22,163,74,0.4); }
 
 .btn-secondary {
     display:inline-flex; align-items:center; gap:8px;
@@ -81,29 +78,31 @@
 }
 .btn-green:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(22,163,74,0.4); }
 
-/* Visualisasi skala */
-.skala-bar { height:16px; border-radius:99px; overflow:hidden; background:#e2e8f0; margin:8px 0; position:relative; }
-.skala-fill-aman    { position:absolute; left:0; top:0; height:100%; background:#22c55e; }
-.skala-fill-waspada { position:absolute; top:0; height:100%; background:#facc15; }
-.skala-fill-hama    { position:absolute; top:0; height:100%; right:0; background:#ef4444; }
-.skala-labels { display:flex; justify-content:space-between; font-size:10px; font-family:var(--mono); color:var(--abu); }
+/* Form input user */
+.form-group { margin-bottom:16px; }
+.form-group:last-child { margin-bottom:0; }
+.form-label { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.form-label span { font-size:13px; font-weight:600; color:var(--teks2); }
+.form-input {
+    width:100%; padding:10px 12px; border:1.5px solid #e2e8f0; border-radius:8px;
+    font-size:14px; font-weight:600; font-family:var(--mono); color:var(--teks);
+    background:#f8fafc; transition:border-color 0.15s, box-shadow 0.15s; outline:none;
+}
+.form-input:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,0.12); background:white; }
+.password-wrap { position:relative; }
+.password-wrap .form-input { padding-right:40px; }
+.toggle-pw { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--abu); padding:0; }
+.field-error { font-size:12px; color:#dc2626; margin-top:4px; }
 
 /* Tabel user */
 .role-badge { display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:700; }
 .role-admin { background:#ede9fe; color:#6d28d9; }
 .role-user  { background:#dcfce7; color:#166534; }
 
-/* Password field */
-.password-wrap { position:relative; }
-.password-wrap .form-input { padding-right:40px; }
-.toggle-pw { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--abu); padding:0; }
-
-/* Validation error per field */
-.field-error { font-size:12px; color:#dc2626; margin-top:4px; }
-
 @media (max-width:900px) {
     .admin-grid { grid-template-columns:1fr; }
     .stat-row   { grid-template-columns:repeat(2,1fr); }
+    .minmax-grid{ grid-template-columns:1fr; }
 }
 </style>
 
@@ -111,25 +110,24 @@
 <div class="page-header">
     <div>
         <h1>⚙️ Panel Administrator</h1>
-        <p>Kelola pengaturan threshold suhu dan akun pengguna sistem SmartFarm</p>
+        <p>Kelola kondisi ideal lingkungan tanaman dan akun pengguna sistem SmartFarm</p>
     </div>
     <div class="admin-badge">
-        <i data-feather="shield" style="width:13px;height:13px;"></i>
-        Admin
+        <i data-feather="shield" style="width:13px;height:13px;"></i> Admin
     </div>
 </div>
 
 {{-- ── STAT CARDS ── --}}
 <div class="stat-row">
     <div class="stat-card">
-        <div class="stat-icon" style="background:#eff6ff;">📊</div>
+        <div class="stat-icon" style="background:#ede9fe;">📡</div>
         <div>
-            <div class="stat-val">{{ number_format($totalData) }}</div>
-            <div class="stat-label">Total Data Sensor (DB)</div>
+            <div class="stat-val" style="color:#7c3aed;">{{ number_format($totalData) }}</div>
+            <div class="stat-label">Total Data Sensor</div>
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon" style="background:#fef2f2;">🚨</div>
+        <div class="stat-icon" style="background:#fef2f2;">🐛</div>
         <div>
             <div class="stat-val" style="color:#dc2626;">{{ number_format($totalHama) }}</div>
             <div class="stat-label">Data Terdeteksi HAMA</div>
@@ -143,9 +141,9 @@
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon" style="background:#ede9fe;">🔑</div>
+        <div class="stat-icon" style="background:#fff7ed;">🛡️</div>
         <div>
-            <div class="stat-val" style="color:#7c3aed;">{{ $users->where('role','admin')->count() }}</div>
+            <div class="stat-val" style="color:#ea580c;">{{ $users->where('role','admin')->count() }}</div>
             <div class="stat-label">Akun Admin</div>
         </div>
     </div>
@@ -154,155 +152,203 @@
 {{-- ── GRID UTAMA ── --}}
 <div class="admin-grid">
 
-    {{-- ══ PANEL KIRI: THRESHOLD SUHU ══ --}}
-    <div>
-        <div class="panel" style="margin-bottom:20px;">
-            <div class="panel-header">
-                <div class="panel-title">🌡️ Pengaturan Threshold Suhu</div>
-                <span style="font-size:11px;color:var(--abu);">Mempengaruhi kalkulasi Fuzzy Sugeno</span>
-            </div>
-            <div class="panel-body">
+    {{-- ══ KIRI: KONFIGURASI KONDISI IDEAL ══ --}}
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">🌱 Konfigurasi Kondisi Ideal Tanaman Jagung</div>
+        </div>
+        <div class="panel-body">
 
-                {{-- Info singkat --}}
-                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 14px; margin-bottom:16px; font-size:12px; color:#1e40af; line-height:1.6;">
-                    <b>ℹ️</b> Perubahan threshold suhu langsung mempengaruhi hasil deteksi hama
-                    di Dashboard, Prediksi, dan Riwayat. Berlaku setelah disimpan.
+            @php
+                // ── Helper anti-error: jika baris setting belum ada di DB
+                // (migration belum jalan / key beda), pakai objek default
+                // agar blade TIDAK crash dengan "Attempt to read property
+                // value on null". Jalankan migration agar nilai tersimpan
+                // permanen ke DB.
+                $defaults = [
+                    'suhu_min'  => ['value' => 22, 'min_input' => 10, 'max_input' => 35, 'satuan' => '°C'],
+                    'suhu_max'  => ['value' => 30, 'min_input' => 15, 'max_input' => 45, 'satuan' => '°C'],
+                    'udara_min' => ['value' => 60, 'min_input' => 0,  'max_input' => 100, 'satuan' => '%'],
+                    'udara_max' => ['value' => 80, 'min_input' => 0,  'max_input' => 100, 'satuan' => '%'],
+                    'tanah_min' => ['value' => 55, 'min_input' => 0,  'max_input' => 100, 'satuan' => '%'],
+                    'tanah_max' => ['value' => 75, 'min_input' => 0,  'max_input' => 100, 'satuan' => '%'],
+                ];
+
+                $get = function ($key) use ($settings, $defaults) {
+                    $row = $settings->firstWhere('key', $key);
+                    if ($row) return $row;
+
+                    // bentuk objek sederhana agar bisa diakses dengan -> seperti Eloquent model
+                    return (object) array_merge(['key' => $key], $defaults[$key]);
+                };
+
+                $suhuMin  = $get('suhu_min');
+                $suhuMax  = $get('suhu_max');
+                $udaraMin = $get('udara_min');
+                $udaraMax = $get('udara_max');
+                $tanahMin = $get('tanah_min');
+                $tanahMax = $get('tanah_max');
+            @endphp
+
+            @if($settings->firstWhere('key','suhu_min') === null)
+                <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:12px 14px; margin-bottom:16px; font-size:12px; color:#92400e; line-height:1.6;">
+                    <b>⚠️ Perhatian:</b> Pengaturan belum tersimpan permanen di database.
+                    Jalankan <code>php artisan migrate</code> agar perubahan dapat disimpan.
+                    Saat ini menampilkan nilai default sementara.
+                </div>
+            @endif
+
+            <form action="{{ route('admin.threshold.update') }}" method="POST" id="formThreshold">
+                @csrf
+
+                {{-- ── SUHU UDARA ── --}}
+                <div class="param-card">
+                    <div class="param-title">
+                        <span class="pi" style="background:#fee2e2;">🌡️</span>
+                        Suhu Udara (°C)
+                    </div>
+                    <div class="minmax-grid">
+                        <div>
+                            <label class="minmax-label">Min Ideal (°C)</label>
+                            <input type="number" step="0.5"
+                                name="settings[suhu_min]"
+                                id="suhu_min"
+                                value="{{ old('settings.suhu_min', $suhuMin->value) }}"
+                                min="{{ $suhuMin->min_input }}" max="{{ $suhuMin->max_input }}"
+                                class="minmax-input" oninput="updateRange('suhu')">
+                        </div>
+                        <div>
+                            <label class="minmax-label">Max Ideal (°C)</label>
+                            <input type="number" step="0.5"
+                                name="settings[suhu_max]"
+                                id="suhu_max"
+                                value="{{ old('settings.suhu_max', $suhuMax->value) }}"
+                                min="{{ $suhuMax->min_input }}" max="{{ $suhuMax->max_input }}"
+                                class="minmax-input" oninput="updateRange('suhu')">
+                        </div>
+                    </div>
+                    <div class="range-row" id="bar-suhu">
+                        <div class="range-fill" id="fill-suhu"></div>
+                        <div class="range-dot" id="dot-min-suhu"></div>
+                        <div class="range-dot" id="dot-max-suhu"></div>
+                    </div>
+                    <div class="range-scale">
+                        <span>{{ $suhuMin->min_input }}°C</span>
+                        <span>{{ $suhuMax->max_input }}°C</span>
+                    </div>
+                    <div class="range-optimal" id="label-suhu">
+                        Rentang Optimal: {{ $suhuMin->value }}°C - {{ $suhuMax->value }}°C
+                    </div>
                 </div>
 
-                <form action="{{ route('admin.threshold.update') }}" method="POST" id="formThreshold">
-                    @csrf
-
-                    {{-- Batas Suhu Dingin --}}
-                    <p class="form-section-title">🥶 Zona Suhu Dingin</p>
-                    @foreach($settings->where('key','suhu_dingin_max') as $s)
-                    <div class="form-group">
-                        <div class="form-label">
-                            <span>{{ $s->label }}</span>
-                            <span class="form-range-hint">{{ $s->min_input }}–{{ $s->max_input }}{{ $s->satuan }}</span>
-                        </div>
-                        <div class="form-input-group">
-                            <input type="number" name="settings[{{ $s->key }}]"
-                                value="{{ old('settings.'.$s->key, $s->value) }}"
-                                min="{{ $s->min_input }}" max="{{ $s->max_input }}" step="0.5"
-                                class="form-input">
-                            <span class="form-satuan">{{ $s->satuan }}</span>
-                        </div>
-                        @if($s->keterangan)<p class="form-desc">{{ $s->keterangan }}</p>@endif
+                {{-- ── KELEMBAPAN UDARA ── --}}
+                <div class="param-card">
+                    <div class="param-title">
+                        <span class="pi" style="background:#dbeafe;">💧</span>
+                        Kelembapan Udara (%)
                     </div>
-                    @endforeach
-
-                    <hr class="form-divider">
-
-                    {{-- Batas Suhu Hangat --}}
-                    <p class="form-section-title">🌤️ Zona Suhu Hangat</p>
-                    @foreach($settings->whereIn('key',['suhu_hangat_min','suhu_hangat_max']) as $s)
-                    <div class="form-group">
-                        <div class="form-label">
-                            <span>{{ $s->label }}</span>
-                            <span class="form-range-hint">{{ $s->min_input }}–{{ $s->max_input }}{{ $s->satuan }}</span>
+                    <div class="minmax-grid">
+                        <div>
+                            <label class="minmax-label">Min Ideal (%)</label>
+                            <input type="number" step="1"
+                                name="settings[udara_min]"
+                                id="udara_min"
+                                value="{{ old('settings.udara_min', $udaraMin->value) }}"
+                                min="{{ $udaraMin->min_input }}" max="{{ $udaraMin->max_input }}"
+                                class="minmax-input" oninput="updateRange('udara')">
                         </div>
-                        <div class="form-input-group">
-                            <input type="number" name="settings[{{ $s->key }}]"
-                                value="{{ old('settings.'.$s->key, $s->value) }}"
-                                min="{{ $s->min_input }}" max="{{ $s->max_input }}" step="0.5"
-                                class="form-input">
-                            <span class="form-satuan">{{ $s->satuan }}</span>
-                        </div>
-                        @if($s->keterangan)<p class="form-desc">{{ $s->keterangan }}</p>@endif
-                    </div>
-                    @endforeach
-
-                    <hr class="form-divider">
-
-                    {{-- Batas Suhu Panas --}}
-                    <p class="form-section-title">🔥 Zona Suhu Panas (Berisiko Hama)</p>
-                    @foreach($settings->where('key','suhu_panas_min') as $s)
-                    <div class="form-group">
-                        <div class="form-label">
-                            <span>{{ $s->label }}</span>
-                            <span class="form-range-hint">{{ $s->min_input }}–{{ $s->max_input }}{{ $s->satuan }}</span>
-                        </div>
-                        <div class="form-input-group">
-                            <input type="number" name="settings[{{ $s->key }}]"
-                                value="{{ old('settings.'.$s->key, $s->value) }}"
-                                min="{{ $s->min_input }}" max="{{ $s->max_input }}" step="0.5"
-                                class="form-input">
-                            <span class="form-satuan">{{ $s->satuan }}</span>
-                        </div>
-                        @if($s->keterangan)<p class="form-desc">{{ $s->keterangan }}</p>@endif
-                    </div>
-                    @endforeach
-
-                    <hr class="form-divider">
-
-                    {{-- Threshold Fuzzy --}}
-                    <p class="form-section-title">⚖️ Batas Status Hama (Nilai Fuzzy 0.0–1.0)</p>
-
-                    @foreach($settings->whereIn('key',['threshold_hama','threshold_waspada'])->sortByDesc('value') as $s)
-                    <div class="form-group">
-                        <div class="form-label">
-                            <span>{{ $s->label }}</span>
-                            <span class="form-range-hint">{{ $s->min_input }}–{{ $s->max_input }}</span>
-                        </div>
-                        <div class="form-input-group">
-                            <input type="number" name="settings[{{ $s->key }}]"
-                                value="{{ old('settings.'.$s->key, $s->value) }}"
-                                min="{{ $s->min_input }}" max="{{ $s->max_input }}" step="0.01"
-                                class="form-input"
-                                id="input-{{ $s->key }}">
-                        </div>
-                        @if($s->keterangan)<p class="form-desc">{{ $s->keterangan }}</p>@endif
-                    </div>
-                    @endforeach
-
-                    {{-- Visualisasi skala threshold --}}
-                    @php
-                        $tw = $settings->firstWhere('key','threshold_waspada');
-                        $th = $settings->firstWhere('key','threshold_hama');
-                        $twV = $tw ? $tw->value : 0.45;
-                        $thV = $th ? $th->value : 0.70;
-                    @endphp
-                    <div style="margin-top:4px; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
-                        <div style="font-size:11px; font-weight:600; color:var(--abu); margin-bottom:8px;">📊 Visualisasi Skala Saat Ini</div>
-                        <div class="skala-bar">
-                            <div class="skala-fill-aman"   style="width:{{ $twV * 100 }}%;"></div>
-                            <div class="skala-fill-waspada" style="left:{{ $twV * 100 }}%; width:{{ ($thV - $twV) * 100 }}%;"></div>
-                            <div class="skala-fill-hama"   style="left:{{ $thV * 100 }}%;"></div>
-                        </div>
-                        <div class="skala-labels">
-                            <span>0.0 <b style="color:#16a34a;">AMAN</b></span>
-                            <span id="viz-tw" style="color:#d97706;font-weight:700;">{{ number_format($twV,2) }} WASPADA</span>
-                            <span id="viz-th" style="color:#dc2626;font-weight:700;">{{ number_format($thV,2) }} HAMA</span>
-                            <span>1.0</span>
+                        <div>
+                            <label class="minmax-label">Max Ideal (%)</label>
+                            <input type="number" step="1"
+                                name="settings[udara_max]"
+                                id="udara_max"
+                                value="{{ old('settings.udara_max', $udaraMax->value) }}"
+                                min="{{ $udaraMax->min_input }}" max="{{ $udaraMax->max_input }}"
+                                class="minmax-input" oninput="updateRange('udara')">
                         </div>
                     </div>
-
-                    {{-- Tombol --}}
-                    <div style="display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;">
-                        <button type="submit" class="btn-primary">
-                            <i data-feather="save" style="width:14px;height:14px;"></i> Simpan
-                        </button>
-                        <form action="{{ route('admin.threshold.reset') }}" method="POST"
-                              onsubmit="return confirm('Reset ke nilai default penelitian?')">
-                            @csrf
-                            <button type="submit" class="btn-secondary">
-                                🔄 Reset Default
-                            </button>
-                        </form>
+                    <div class="range-row" id="bar-udara">
+                        <div class="range-fill" id="fill-udara"></div>
+                        <div class="range-dot" id="dot-min-udara"></div>
+                        <div class="range-dot" id="dot-max-udara"></div>
                     </div>
+                    <div class="range-scale">
+                        <span>0%</span>
+                        <span>100%</span>
+                    </div>
+                    <div class="range-optimal" id="label-udara">
+                        Rentang Optimal: {{ $udaraMin->value }}% - {{ $udaraMax->value }}%
+                    </div>
+                </div>
 
-                </form>
-            </div>
+                {{-- ── KELEMBAPAN TANAH ── --}}
+                <div class="param-card">
+                    <div class="param-title">
+                        <span class="pi" style="background:#dcfce7;">🌿</span>
+                        Kelembapan Tanah (%)
+                    </div>
+                    <div class="minmax-grid">
+                        <div>
+                            <label class="minmax-label">Min Ideal (%)</label>
+                            <input type="number" step="1"
+                                name="settings[tanah_min]"
+                                id="tanah_min"
+                                value="{{ old('settings.tanah_min', $tanahMin->value) }}"
+                                min="{{ $tanahMin->min_input }}" max="{{ $tanahMin->max_input }}"
+                                class="minmax-input" oninput="updateRange('tanah')">
+                        </div>
+                        <div>
+                            <label class="minmax-label">Max Ideal (%)</label>
+                            <input type="number" step="1"
+                                name="settings[tanah_max]"
+                                id="tanah_max"
+                                value="{{ old('settings.tanah_max', $tanahMax->value) }}"
+                                min="{{ $tanahMax->min_input }}" max="{{ $tanahMax->max_input }}"
+                                class="minmax-input" oninput="updateRange('tanah')">
+                        </div>
+                    </div>
+                    <div class="range-row" id="bar-tanah">
+                        <div class="range-fill" id="fill-tanah"></div>
+                        <div class="range-dot" id="dot-min-tanah"></div>
+                        <div class="range-dot" id="dot-max-tanah"></div>
+                    </div>
+                    <div class="range-scale">
+                        <span>0%</span>
+                        <span>100%</span>
+                    </div>
+                    <div class="range-optimal" id="label-tanah">
+                        Rentang Optimal: {{ $tanahMin->value }}% - {{ $tanahMax->value }}%
+                    </div>
+                </div>
+
+                {{-- Tombol --}}
+                <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap; justify-content:flex-end;">
+                    <button type="button" class="btn-secondary" onclick="document.getElementById('formReset').submit()">
+                        <i data-feather="rotate-ccw" style="width:14px;height:14px;"></i> Reset Default
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        <i data-feather="save" style="width:14px;height:14px;"></i> Simpan Perubahan
+                    </button>
+                </div>
+
+            </form>
+
+            {{-- Form reset terpisah (dipicu via tombol di atas) --}}
+            <form action="{{ route('admin.threshold.reset') }}" method="POST" id="formReset"
+                  onsubmit="return confirm('Reset ke nilai default penelitian?')" style="display:none;">
+                @csrf
+            </form>
+
         </div>
     </div>
 
-    {{-- ══ PANEL KANAN: MANAJEMEN USER ══ --}}
+    {{-- ══ KANAN: MANAJEMEN USER ══ --}}
     <div>
 
         {{-- Form Tambah User --}}
         <div class="panel" style="margin-bottom:20px;">
             <div class="panel-header">
-                <div class="panel-title">➕ Tambah Pengguna Baru</div>
+                <div class="panel-title">👥 Manajemen Pengguna</div>
             </div>
             <div class="panel-body">
                 <form action="{{ route('admin.users.store') }}" method="POST">
@@ -311,14 +357,14 @@
                     <div class="form-group">
                         <div class="form-label"><span>Nama Lengkap</span></div>
                         <input type="text" name="name" value="{{ old('name') }}"
-                            placeholder="Nama pengguna" class="form-input" autocomplete="off">
+                            placeholder="Masukkan nama lengkap" class="form-input" autocomplete="off">
                         @error('name')<p class="field-error">{{ $message }}</p>@enderror
                     </div>
 
                     <div class="form-group">
                         <div class="form-label"><span>Email</span></div>
                         <input type="email" name="email" value="{{ old('email') }}"
-                            placeholder="email@contoh.com" class="form-input" autocomplete="off">
+                            placeholder="Masukkan email" class="form-input" autocomplete="off">
                         @error('email')<p class="field-error">{{ $message }}</p>@enderror
                     </div>
 
@@ -365,7 +411,7 @@
         {{-- Tabel Daftar User --}}
         <div class="panel">
             <div class="panel-header">
-                <div class="panel-title">👥 Daftar Pengguna ({{ $users->count() }})</div>
+                <div class="panel-title">Daftar Pengguna ({{ $users->count() }})</div>
             </div>
             <div style="overflow-x:auto;">
                 <table class="tabel-data">
@@ -389,18 +435,17 @@
                             <td style="font-size:12px; color:var(--abu); font-family:var(--mono);">{{ $u->email }}</td>
                             <td>
                                 <span class="role-badge {{ $u->role === 'admin' ? 'role-admin' : 'role-user' }}">
-                                    {{ $u->role === 'admin' ? '⚙️ Admin' : '👤 User' }}
+                                    {{ $u->role === 'admin' ? 'Admin' : 'User' }}
                                 </span>
                             </td>
                             <td style="text-align:center;">
                                 @if($u->id !== auth()->id())
                                     <form action="{{ route('admin.users.delete', $u) }}" method="POST"
-                                          onsubmit="return confirm('Hapus pengguna {{ $u->name }}?\nTindakan ini tidak dapat dibatalkan.')">
+                                          onsubmit="return confirm('Hapus pengguna {{ $u->name }}?')">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn-danger">
-                                            <i data-feather="trash-2" style="width:12px;height:12px;"></i>
-                                            Hapus
+                                            <i data-feather="trash-2" style="width:12px;height:12px;"></i> Hapus
                                         </button>
                                     </form>
                                 @else
@@ -409,54 +454,69 @@
                             </td>
                         </tr>
                         @empty
-                        <tr>
-                            <td colspan="4" style="text-align:center; color:var(--abu); padding:20px;">
-                                Belum ada pengguna terdaftar.
-                            </td>
-                        </tr>
+                        <tr><td colspan="4" style="text-align:center; color:var(--abu); padding:20px;">Belum ada pengguna terdaftar.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
         </div>
 
-    </div>{{-- end panel kanan --}}
+    </div>
 
-</div>{{-- end admin-grid --}}
+</div>
 
 <script>
-// ── Toggle password visibility ──────────────────────────────────
 function togglePw(id) {
     var el = document.getElementById(id);
     el.type = el.type === 'password' ? 'text' : 'password';
 }
 
-// ── Update visualisasi skala threshold secara real-time ─────────
-var twInput = document.getElementById('input-threshold_waspada');
-var thInput = document.getElementById('input-threshold_hama');
+// ── Update bar visual untuk satu parameter ──────────────────────
+function updateRange(name) {
+    var minInput = document.getElementById(name + '_min');
+    var maxInput = document.getElementById(name + '_max');
+    var fill     = document.getElementById('fill-' + name);
+    var dotMin   = document.getElementById('dot-min-' + name);
+    var dotMax   = document.getElementById('dot-max-' + name);
+    var label    = document.getElementById('label-' + name);
 
-function updateViz() {
-    var tw = parseFloat(twInput ? twInput.value : {{ $twV }});
-    var th = parseFloat(thInput ? thInput.value : {{ $thV }});
-    var vizTw = document.getElementById('viz-tw');
-    var vizTh = document.getElementById('viz-th');
-    if (vizTw) vizTw.innerText = tw.toFixed(2) + ' WASPADA';
-    if (vizTh) vizTh.innerText = th.toFixed(2) + ' HAMA';
+    var scaleMin = parseFloat(minInput.min);
+    var scaleMax = parseFloat(maxInput.max);
+    var valMin   = parseFloat(minInput.value);
+    var valMax   = parseFloat(maxInput.value);
+
+    var pctMin = ((valMin - scaleMin) / (scaleMax - scaleMin)) * 100;
+    var pctMax = ((valMax - scaleMin) / (scaleMax - scaleMin)) * 100;
+    pctMin = Math.max(0, Math.min(100, pctMin));
+    pctMax = Math.max(0, Math.min(100, pctMax));
+
+    if (fill)   { fill.style.left = pctMin + '%'; fill.style.width = Math.max(0, pctMax - pctMin) + '%'; }
+    if (dotMin) dotMin.style.left = pctMin + '%';
+    if (dotMax) dotMax.style.left = pctMax + '%';
+
+    var unit = (name === 'suhu') ? '°C' : '%';
+    if (label) label.innerText = 'Rentang Optimal: ' + valMin + unit + ' - ' + valMax + unit;
 }
 
-if (twInput) twInput.addEventListener('input', updateViz);
-if (thInput) thInput.addEventListener('input', updateViz);
-
-// ── Validasi client-side sebelum submit threshold ───────────────
+// ── Validasi: min harus < max ────────────────────────────────────
 document.getElementById('formThreshold').addEventListener('submit', function(e) {
-    var tw = parseFloat(twInput ? twInput.value : 0);
-    var th = parseFloat(thInput ? thInput.value : 1);
-
-    if (tw >= th) {
-        e.preventDefault();
-        alert('⚠️ Batas WASPADA (' + tw + ') harus lebih kecil dari batas HAMA (' + th + ').\nSilakan perbaiki sebelum menyimpan.');
-        return false;
+    var pairs = [['suhu_min','suhu_max'], ['udara_min','udara_max'], ['tanah_min','tanah_max']];
+    for (var i = 0; i < pairs.length; i++) {
+        var minVal = parseFloat(document.getElementById(pairs[i][0]).value);
+        var maxVal = parseFloat(document.getElementById(pairs[i][1]).value);
+        if (minVal >= maxVal) {
+            e.preventDefault();
+            alert('⚠️ Nilai Min harus lebih kecil dari Max pada parameter ' + pairs[i][0].split('_')[0] + '.');
+            return false;
+        }
     }
+});
+
+// ── Inisialisasi semua bar saat halaman load ─────────────────────
+window.addEventListener('load', function () {
+    updateRange('suhu');
+    updateRange('udara');
+    updateRange('tanah');
 });
 </script>
 

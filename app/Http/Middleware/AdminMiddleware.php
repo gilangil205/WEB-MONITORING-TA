@@ -1,10 +1,5 @@
 <?php
-// ============================================================
-// FILE 5: app/Http/Middleware/AdminMiddleware.php  (FILE BARU)
-// ============================================================
-
 namespace App\Http\Middleware;
-
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,7 +13,10 @@ class AdminMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check() || !Auth::user()->isAdmin()) {
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        if (!$user || !$user->isAdmin()) {
             return redirect()->route('dashboard')
                 ->with('error', 'Akses ditolak. Halaman ini khusus Administrator.');
         }

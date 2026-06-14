@@ -299,12 +299,6 @@
             <i data-feather="settings"></i> Panel Admin
         </a>
 
-        {{-- Tombol Navigasi Kembali ke Sisi Petani --}}
-        <hr class="sidebar-divider">
-        <a href="{{ route('dashboard') }}" style="color:#94a3b8;">
-            <i data-feather="arrow-left"></i> Monitoring Petani
-        </a>
-
     @else
         
         {{-- JIKA DI HALAMAN UTAMA (PETANI): Tampilkan menu monitoring lengkap --}}
