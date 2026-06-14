@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>@yield('title') — SmartFarm</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/feather-icons"></script>
 
@@ -25,7 +25,7 @@
             --teks2:      #475569;
             --radius:     14px;
             --shadow:     0 4px 24px rgba(0,0,0,0.07);
-            --font:       'Space Grotesk', sans-serif;
+            --font:       'Plus Jakarta Sans', sans-serif;
             --mono:       'JetBrains Mono', monospace;
         }
 
@@ -65,9 +65,9 @@
         .alert-error   { background:#fef2f2; border-left:4px solid #ef4444; color:#991b1b; padding:12px 16px; border-radius:8px; margin-bottom:20px; font-size:14px; }
 
         /* ── PAGE HEADER ── */
-        .page-header { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:24px; }
-        .page-header h1 { font-size:22px; font-weight:700; color:var(--teks); margin-bottom:2px; }
-        .page-header p  { font-size:13px; color:var(--abu); }
+        .page-header { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:28px; }
+        .page-header h1 { font-size:24px; font-weight:700; color:var(--teks); margin-bottom:4px; }
+        .page-header p  { font-size:13px; color:var(--abu); line-height:1.6; }
 
         .update-badge { display:flex; align-items:center; gap:6px; background:white; border:1px solid var(--border); padding:6px 12px; border-radius:99px; font-size:12px; color:var(--abu); font-family:var(--mono); }
         .update-badge .dot { width:7px; height:7px; background:var(--hijau-muda); border-radius:50%; animation:sf-blink 1.4s ease-in-out infinite; }
@@ -77,9 +77,9 @@
 
         /* ── PANEL ── */
         .panel { background:var(--card); border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; }
-        .panel-header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+        .panel-header { padding:16px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
         .panel-title  { font-size:14px; font-weight:700; color:var(--teks); display:flex; align-items:center; gap:8px; }
-        .panel-body   { padding:20px; }
+        .panel-body   { padding:24px; }
 
         /* ── SENSOR GRID ── */
         .sensor-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px; }
@@ -335,9 +335,10 @@
         <form action="{{ route('logout') }}" method="POST">
             @csrf
             <button type="submit"
-                style="width:100%; background:#ef4444; color:white; border:none; padding:10px;
+                style="width:100%; background:#ef4444; color:white; border:none; padding:11px;
                        border-radius:8px; cursor:pointer; font-weight:600; font-family:var(--font);
-                       display:flex; align-items:center; gap:8px; justify-content:center; font-size:13px;">
+                       display:flex; align-items:center; gap:8px; justify-content:center; font-size:13px;
+                       transition:all 0.2s; box-shadow:0 2px 8px rgba(239,68,68,0.25);">
                 <i data-feather="log-out" style="width:14px;"></i> Keluar
             </button>
         </form>
@@ -380,6 +381,11 @@
     @endif
 
     @yield('content')
+
+    {{-- FOOTER --}}
+    <div style="border-top:1px solid var(--border); padding:20px 0; margin-top:40px; text-align:center; font-size:12px; color:var(--abu);">
+        © 2025 SmartFarm. All rights reserved.
+    </div>
 </div>
 
 <div id="popupWarning" class="popup-warning">

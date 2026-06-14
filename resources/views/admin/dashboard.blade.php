@@ -5,97 +5,102 @@
 @section('content')
 <style>
 .admin-badge {
-    display:inline-flex; align-items:center; gap:6px;
+    display:inline-flex; align-items:center; gap:8px;
     background:linear-gradient(135deg,#7c3aed,#6d28d9);
-    color:white; padding:6px 14px; border-radius:99px;
+    color:white; padding:8px 16px; border-radius:99px;
     font-size:12px; font-weight:700;
+    box-shadow:0 2px 8px rgba(124,58,237,0.25);
 }
 
 /* Stat cards */
-.stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
-.stat-card { background:white; border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; box-shadow:var(--shadow); display:flex; align-items:center; gap:12px; }
-.stat-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
-.stat-val   { font-size:24px; font-weight:700; color:var(--teks); font-family:var(--mono); line-height:1; }
-.stat-label { font-size:11px; color:var(--abu); font-weight:500; margin-top:2px; }
+.stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; margin-bottom:32px; }
+.stat-card { background:white; border:1px solid #e2e8f0; border-radius:16px; padding:24px; box-shadow:0 4px 20px rgba(0,0,0,0.06); display:flex; align-items:center; gap:18px; transition:transform 0.2s, box-shadow 0.2s; }
+.stat-card:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(0,0,0,0.1); }
+.stat-icon { width:60px; height:60px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0; }
+.stat-val   { font-size:32px; font-weight:800; color:var(--teks); font-family:var(--mono); line-height:1; }
+.stat-label { font-size:12px; color:var(--abu); font-weight:600; margin-top:4px; }
 
 /* Layout dua kolom */
-.admin-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:20px; align-items:start; }
+.admin-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:24px; align-items:start; }
 
 /* ── Kartu parameter (Suhu / Udara / Tanah) ── */
-.param-card { border:1px solid #e2e8f0; border-radius:12px; padding:18px 20px; margin-bottom:18px; }
+.param-card { border:1px solid #e2e8f0; border-radius:14px; padding:24px; margin-bottom:20px; background:white; box-shadow:0 2px 12px rgba(0,0,0,0.04); }
 .param-card:last-of-type { margin-bottom:0; }
-.param-title { display:flex; align-items:center; gap:10px; font-size:15px; font-weight:700; color:var(--teks); margin-bottom:16px; }
-.param-title .pi { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:17px; }
+.param-title { display:flex; align-items:center; gap:12px; font-size:15px; font-weight:700; color:var(--teks); margin-bottom:20px; }
+.param-title .pi { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px; }
 
-.minmax-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px; }
-.minmax-label { font-size:13px; font-weight:600; color:var(--teks2); margin-bottom:6px; display:block; }
+.minmax-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:18px; }
+.minmax-label { font-size:13px; font-weight:600; color:#475569; margin-bottom:8px; display:block; }
 .minmax-input {
-    width:100%; padding:10px 12px; border:1.5px solid #e2e8f0; border-radius:8px;
+    width:100%; padding:11px 14px; border:1.5px solid #e2e8f0; border-radius:10px;
     font-size:14px; font-weight:600; font-family:var(--mono); color:var(--teks);
-    background:#f8fafc; transition:border-color 0.15s, box-shadow 0.15s; outline:none;
+    background:#fafbfc; transition:border-color 0.15s, box-shadow 0.15s, background 0.15s; outline:none;
 }
-.minmax-input:focus { border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,0.12); background:white; }
+.minmax-input:focus { border-color:#16a34a; box-shadow:0 0 0 3px rgba(22,163,74,0.1); background:white; }
 
 /* Range bar dua titik */
-.range-row { position:relative; height:6px; background:#e2e8f0; border-radius:99px; margin:18px 0 6px; }
-.range-fill { position:absolute; top:0; height:100%; background:#22c55e; border-radius:99px; }
-.range-dot { position:absolute; top:50%; width:14px; height:14px; background:#16a34a; border:3px solid white; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 1px 4px rgba(0,0,0,0.25); }
-.range-scale { display:flex; justify-content:space-between; font-size:11px; color:var(--abu); font-family:var(--mono); }
-.range-optimal { text-align:center; font-size:12px; font-weight:700; color:#16a34a; margin-top:6px; }
+.range-row { position:relative; height:8px; background:#e2e8f0; border-radius:99px; margin:22px 0 8px; }
+.range-fill { position:absolute; top:0; height:100%; background:#16a34a; border-radius:99px; }
+.range-dot { position:absolute; top:50%; width:16px; height:16px; background:#16a34a; border:3px solid white; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 2px 6px rgba(22,163,74,0.3); }
+.range-scale { display:flex; justify-content:space-between; font-size:12px; color:#64748b; font-family:var(--mono); font-weight:500; }
+.range-optimal { text-align:center; font-size:13px; font-weight:700; color:#16a34a; margin-top:8px; }
 
 /* Tombol */
 .btn-primary {
     display:inline-flex; align-items:center; gap:8px;
     background:linear-gradient(135deg,#16a34a,#15803d); color:white;
-    border:none; padding:11px 24px; border-radius:10px; cursor:pointer;
+    border:none; padding:12px 26px; border-radius:10px; cursor:pointer;
     font-size:14px; font-weight:700; font-family:var(--font);
-    box-shadow:0 4px 12px rgba(22,163,74,0.3); transition:all 0.2s;
+    box-shadow:0 4px 14px rgba(22,163,74,0.3); transition:all 0.2s;
 }
-.btn-primary:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(22,163,74,0.4); }
+.btn-primary:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(22,163,74,0.4); }
+.btn-primary:active { transform:translateY(0); }
 
 .btn-secondary {
     display:inline-flex; align-items:center; gap:8px;
     background:white; color:#64748b; border:1.5px solid #e2e8f0;
-    padding:10px 20px; border-radius:10px; cursor:pointer;
+    padding:11px 22px; border-radius:10px; cursor:pointer;
     font-size:13px; font-weight:600; font-family:var(--font); transition:all 0.15s;
 }
 .btn-secondary:hover { background:#f8fafc; border-color:#cbd5e1; color:var(--teks); }
 
 .btn-danger {
     display:inline-flex; align-items:center; gap:6px;
-    background:#fef2f2; color:#dc2626; border:1px solid #fca5a5;
-    padding:6px 12px; border-radius:7px; cursor:pointer;
+    background:#fef2f2; color:#dc2626; border:1.5px solid #fca5a5;
+    padding:7px 14px; border-radius:8px; cursor:pointer;
     font-size:12px; font-weight:600; font-family:var(--font); transition:all 0.15s;
 }
-.btn-danger:hover { background:#dc2626; color:white; }
+.btn-danger:hover { background:#dc2626; color:white; border-color:#dc2626; }
 
 .btn-green {
     display:inline-flex; align-items:center; gap:8px;
     background:linear-gradient(135deg,#16a34a,#15803d); color:white;
-    border:none; padding:11px 24px; border-radius:10px; cursor:pointer;
+    border:none; padding:12px 26px; border-radius:10px; cursor:pointer;
     font-size:14px; font-weight:700; font-family:var(--font);
-    box-shadow:0 4px 12px rgba(22,163,74,0.3); transition:all 0.2s;
+    box-shadow:0 4px 14px rgba(22,163,74,0.3); transition:all 0.2s;
 }
-.btn-green:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(22,163,74,0.4); }
+.btn-green:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(22,163,74,0.4); }
 
 /* Form input user */
-.form-group { margin-bottom:16px; }
+.form-group { margin-bottom:18px; }
 .form-group:last-child { margin-bottom:0; }
-.form-label { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
-.form-label span { font-size:13px; font-weight:600; color:var(--teks2); }
+.form-label { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.form-label span { font-size:13px; font-weight:600; color:#475569; }
 .form-input {
-    width:100%; padding:10px 12px; border:1.5px solid #e2e8f0; border-radius:8px;
+    width:100%; padding:11px 14px; border:1.5px solid #e2e8f0; border-radius:10px;
     font-size:14px; font-weight:600; font-family:var(--mono); color:var(--teks);
-    background:#f8fafc; transition:border-color 0.15s, box-shadow 0.15s; outline:none;
+    background:#fafbfc; transition:border-color 0.15s, box-shadow 0.15s, background 0.15s; outline:none;
 }
-.form-input:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,0.12); background:white; }
+.form-input:focus { border-color:#7c3aed; box-shadow:0 0 0 3px rgba(124,58,237,0.1); background:white; }
+.form-input::placeholder { color:#cbd5e1; }
 .password-wrap { position:relative; }
-.password-wrap .form-input { padding-right:40px; }
-.toggle-pw { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--abu); padding:0; }
-.field-error { font-size:12px; color:#dc2626; margin-top:4px; }
+.password-wrap .form-input { padding-right:42px; }
+.toggle-pw { position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:#94a3b8; padding:0; transition:color 0.2s; }
+.toggle-pw:hover { color:#64748b; }
+.field-error { font-size:12px; color:#dc2626; margin-top:5px; font-weight:500; }
 
 /* Tabel user */
-.role-badge { display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:700; }
+.role-badge { display:inline-block; padding:4px 12px; border-radius:10px; font-size:12px; font-weight:700; }
 .role-admin { background:#ede9fe; color:#6d28d9; }
 .role-user  { background:#dcfce7; color:#166534; }
 
@@ -120,30 +125,30 @@
 {{-- ── STAT CARDS ── --}}
 <div class="stat-row">
     <div class="stat-card">
-        <div class="stat-icon" style="background:#ede9fe;">📡</div>
+        <div class="stat-icon" style="background:#f3e8ff;">📡</div>
         <div>
             <div class="stat-val" style="color:#7c3aed;">{{ number_format($totalData) }}</div>
             <div class="stat-label">Total Data Sensor</div>
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon" style="background:#fef2f2;">🐛</div>
+        <div class="stat-icon" style="background:#fee2e2;">🐛</div>
         <div>
             <div class="stat-val" style="color:#dc2626;">{{ number_format($totalHama) }}</div>
             <div class="stat-label">Data Terdeteksi HAMA</div>
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon" style="background:#f0fdf4;">👥</div>
+        <div class="stat-icon" style="background:#dcfce7;">👥</div>
         <div>
             <div class="stat-val" style="color:#16a34a;">{{ $users->count() }}</div>
             <div class="stat-label">Total Pengguna</div>
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon" style="background:#fff7ed;">🛡️</div>
+        <div class="stat-icon" style="background:#fef3c7;">🛡️</div>
         <div>
-            <div class="stat-val" style="color:#ea580c;">{{ $users->where('role','admin')->count() }}</div>
+            <div class="stat-val" style="color:#d97706;">{{ $users->where('role','admin')->count() }}</div>
             <div class="stat-label">Akun Admin</div>
         </div>
     </div>
@@ -322,7 +327,7 @@
                 </div>
 
                 {{-- Tombol --}}
-                <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap; justify-content:flex-end;">
+                <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; justify-content:flex-end;">
                     <button type="button" class="btn-secondary" onclick="document.getElementById('formReset').submit()">
                         <i data-feather="rotate-ccw" style="width:14px;height:14px;"></i> Reset Default
                     </button>
@@ -346,7 +351,7 @@
     <div>
 
         {{-- Form Tambah User --}}
-        <div class="panel" style="margin-bottom:20px;">
+        <div class="panel" style="margin-bottom:24px;">
             <div class="panel-header">
                 <div class="panel-title">👥 Manajemen Pengguna</div>
             </div>
@@ -400,7 +405,7 @@
                         @error('role')<p class="field-error">{{ $message }}</p>@enderror
                     </div>
 
-                    <button type="submit" class="btn-green" style="width:100%; justify-content:center; margin-top:4px;">
+                    <button type="submit" class="btn-green" style="width:100%; justify-content:center; margin-top:6px;">
                         <i data-feather="user-plus" style="width:14px;height:14px;"></i>
                         Tambah Pengguna
                     </button>
