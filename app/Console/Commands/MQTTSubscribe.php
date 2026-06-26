@@ -6,7 +6,7 @@ use Illuminate\Console\Command;
 use PhpMqtt\Client\MqttClient;
 use PhpMqtt\Client\ConnectionSettings;
 use App\Models\SensorReading;
-use Illuminate\Support\Facades\Cache; // 💡 TAMBAHAN
+use Illuminate\Support\Facades\Cache;
 
 class MQTTSubscribe extends Command
 {
@@ -16,12 +16,21 @@ class MQTTSubscribe extends Command
     public function handle()
     {
         $server   = env('MQTT_HOST');
-        $port     = env('MQTT_PORT');
-        $clientId = env('MQTT_CLIENT_ID') . uniqid();
+        $port     = (int) env('MQTT_PORT', 8883);
+        $clientId = env('MQTT_CLIENT_ID', 'laravel-server-') . uniqid();
+        $username = env('MQTT_USERNAME');
+        $password = env('MQTT_PASSWORD');
+        $useTls   = filter_var(env('MQTT_USE_TLS', true), FILTER_VALIDATE_BOOLEAN);
 
         $connectionSettings = (new ConnectionSettings)
-                ->setKeepAliveInterval(10) 
-                ->setConnectTimeout(3);
+                ->setKeepAliveInterval(10)
+                ->setConnectTimeout(5)
+                ->setUsername($username)
+                ->setPassword($password)
+                ->setUseTls($useTls)
+                ->setTlsVerifyPeer(true)
+                ->setTlsSelfSignedAllowed(false);
+
         $mqtt = new MqttClient($server, $port, $clientId);
 
         $mqtt->connect($connectionSettings, true);
@@ -55,11 +64,11 @@ class MQTTSubscribe extends Command
                 'updated_at'       => now()->toIso8601String()
             ];
 
-            // 💡 REVISI POIN 4: Simpan ke Cache setiap data MQTT masuk (Validasi Alat Online per 5 Menit)
+            // REVISI POIN 4: Simpan ke Cache setiap data MQTT masuk (Validasi Alat Online per 5 Menit)
             Cache::put('iot_live_data', $cacheData, now()->addMinutes(7));
             $this->info('Cache real-time berhasil diperbarui.');
 
-            // 💡 REVISI POIN 5: Simpan ke Database dibatasi setiap interval 15 menit menggunakan Cooldown Lock
+            // REVISI POIN 5: Simpan ke Database dibatasi setiap interval 15 menit menggunakan Cooldown Lock
             if (!Cache::has('iot_db_cooldown')) {
                 SensorReading::create([
                     'suhu'             => $suhu,

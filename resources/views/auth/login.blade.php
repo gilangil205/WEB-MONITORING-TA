@@ -255,25 +255,6 @@
                 Sistem monitoring hama jagung berbasis IoT dan Fuzzy Sugeno 
                 untuk membantu petani mendeteksi potensi serangan hama secara real-time.
             </p>
-
-            <div class="iot-box">
-
-                <div class="iot-card">
-                    <h3>Status Sensor</h3>
-                    <p>ONLINE</p>
-                </div>
-
-                <div class="iot-card">
-                    <h3>Monitoring</h3>
-                    <p>24/7</p>
-                </div>
-
-                <div class="iot-card">
-                    <h3>Akurasi</h3>
-                    <p>Realtime</p>
-                </div>
-
-            </div>
         </div>
 
     </div>

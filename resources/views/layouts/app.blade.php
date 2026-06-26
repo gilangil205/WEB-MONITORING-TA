@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>@yield('title') — SmartFarm</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/feather-icons"></script>
 
@@ -25,7 +25,7 @@
             --teks2:      #475569;
             --radius:     14px;
             --shadow:     0 4px 24px rgba(0,0,0,0.07);
-            --font:       'Plus Jakarta Sans', sans-serif;
+            --font:       'Space Grotesk', sans-serif;
             --mono:       'JetBrains Mono', monospace;
         }
 
@@ -65,9 +65,9 @@
         .alert-error   { background:#fef2f2; border-left:4px solid #ef4444; color:#991b1b; padding:12px 16px; border-radius:8px; margin-bottom:20px; font-size:14px; }
 
         /* ── PAGE HEADER ── */
-        .page-header { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:28px; }
-        .page-header h1 { font-size:24px; font-weight:700; color:var(--teks); margin-bottom:4px; }
-        .page-header p  { font-size:13px; color:var(--abu); line-height:1.6; }
+        .page-header { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:24px; }
+        .page-header h1 { font-size:22px; font-weight:700; color:var(--teks); margin-bottom:2px; }
+        .page-header p  { font-size:13px; color:var(--abu); }
 
         .update-badge { display:flex; align-items:center; gap:6px; background:white; border:1px solid var(--border); padding:6px 12px; border-radius:99px; font-size:12px; color:var(--abu); font-family:var(--mono); }
         .update-badge .dot { width:7px; height:7px; background:var(--hijau-muda); border-radius:50%; animation:sf-blink 1.4s ease-in-out infinite; }
@@ -77,9 +77,9 @@
 
         /* ── PANEL ── */
         .panel { background:var(--card); border-radius:var(--radius); border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; }
-        .panel-header { padding:16px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+        .panel-header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
         .panel-title  { font-size:14px; font-weight:700; color:var(--teks); display:flex; align-items:center; gap:8px; }
-        .panel-body   { padding:24px; }
+        .panel-body   { padding:20px; }
 
         /* ── SENSOR GRID ── */
         .sensor-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px; }
@@ -266,11 +266,61 @@
             .kamera-grid  { grid-template-columns:1fr; }
             .grid-prediksi{ grid-template-columns:1fr; }
         }
+
+        /* ── TOPBAR MOBILE (hamburger) — sembunyi di desktop ── */
+        .mobile-topbar  { display:none; }
+        .sidebar-overlay{ display:none; }
+
+        /* ── TABLET & HP: sidebar jadi off-canvas ── */
+        @media (max-width:768px) {
+            .sidebar {
+                transform:translateX(-100%);
+                transition:transform 0.3s ease;
+                z-index:1000;
+                box-shadow:4px 0 24px rgba(0,0,0,0.35);
+            }
+            .sidebar.open { transform:translateX(0); }
+            .main { margin-left:0; padding:74px 16px 24px; }
+            .mobile-topbar {
+                display:flex; align-items:center; gap:12px;
+                position:fixed; top:0; left:0; right:0; height:56px;
+                background:#0f172a; z-index:900; padding:0 14px;
+                box-shadow:0 2px 8px rgba(0,0,0,0.15);
+            }
+            .mobile-topbar button {
+                background:none; border:none; color:#f8fafc; cursor:pointer;
+                display:flex; align-items:center; padding:6px;
+            }
+            .mobile-topbar button svg { width:24px; height:24px; }
+            .mobile-topbar .mt-title  { color:#f8fafc; font-size:15px; font-weight:700; }
+            .sidebar-overlay {
+                position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:999;
+            }
+            .sidebar-overlay.show { display:block; }
+            .page-header h1 { font-size:20px; }
+        }
+
+        /* ── HP KECIL: semua kartu jadi 1 kolom ── */
+        @media (max-width:560px) {
+            .sensor-grid { grid-template-columns:1fr; }
+            .mini-grid   { grid-template-columns:1fr; }
+            .panel-body  { padding:16px; }
+            .sensor-card .sc-value { font-size:26px; }
+            .fuzzy-meter-val       { font-size:34px; }
+            .main { padding:70px 12px 20px; }
+            .page-header h1 { font-size:18px; }
+        }
     </style>
 </head>
 <body>
 
-<div class="sidebar">
+<div class="mobile-topbar">
+    <button onclick="toggleSidebar()" aria-label="Buka menu"><i data-feather="menu"></i></button>
+    <span class="mt-title">🌽 SmartFarm</span>
+</div>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="sidebar" id="appSidebar">
     <div class="sidebar-brand">
         <span>🌽 SmartFarm<small>Monitoring Hama Jagung</small></span>
     </div>
@@ -335,10 +385,9 @@
         <form action="{{ route('logout') }}" method="POST">
             @csrf
             <button type="submit"
-                style="width:100%; background:#ef4444; color:white; border:none; padding:11px;
+                style="width:100%; background:#ef4444; color:white; border:none; padding:10px;
                        border-radius:8px; cursor:pointer; font-weight:600; font-family:var(--font);
-                       display:flex; align-items:center; gap:8px; justify-content:center; font-size:13px;
-                       transition:all 0.2s; box-shadow:0 2px 8px rgba(239,68,68,0.25);">
+                       display:flex; align-items:center; gap:8px; justify-content:center; font-size:13px;">
                 <i data-feather="log-out" style="width:14px;"></i> Keluar
             </button>
         </form>
@@ -381,11 +430,6 @@
     @endif
 
     @yield('content')
-
-    {{-- FOOTER --}}
-    <div style="border-top:1px solid var(--border); padding:20px 0; margin-top:40px; text-align:center; font-size:12px; color:var(--abu);">
-        © 2025 SmartFarm. All rights reserved.
-    </div>
 </div>
 
 <div id="popupWarning" class="popup-warning">
@@ -402,6 +446,20 @@
 
 <script>
     feather.replace();
+
+    // ── Toggle sidebar di tampilan mobile ──
+    function toggleSidebar() {
+        var sb = document.getElementById('appSidebar');
+        var ov = document.getElementById('sidebarOverlay');
+        if (sb) sb.classList.toggle('open');
+        if (ov) ov.classList.toggle('show');
+    }
+    // Tutup sidebar otomatis saat menu diklik (mobile)
+    document.querySelectorAll('#appSidebar a').forEach(function(link) {
+        link.addEventListener('click', function() {
+            if (window.innerWidth <= 768) toggleSidebar();
+        });
+    });
 
     function showPopup()  { document.getElementById('popupWarning').style.display = 'flex'; }
     function hidePopup()  { document.getElementById('popupWarning').style.display = 'none'; }

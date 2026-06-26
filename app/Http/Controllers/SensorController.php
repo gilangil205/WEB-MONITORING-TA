@@ -14,11 +14,11 @@ use Illuminate\Support\Collection;
 
 class SensorController extends Controller
 {
-    // ── Lebar transisi fuzzy — konstanta, TIDAK diatur admin ────────────────
-    // Menentukan seberapa landai perubahan dari kering→normal→lembap dan
-    // dingin→hangat→panas di sekitar nilai min/max yang diatur admin.
-    private const T_SUHU   = 5;   // °C
-    private const T_LEMBAP = 10;  // %
+    // ── Lebar transisi fuzzy (°C / %) — TIDAK diatur admin ─────────────────
+    // Menentukan seberapa "landai" perubahan derajat keanggotaan
+    // di sekitar batas zona yang diatur admin.
+    private const T_SUHU   = 3;   // °C  — transisi antar zona suhu
+    private const T_LEMBAP = 5;   // %   — transisi antar zona kelembapan
 
     // ================== HELPER: RESOLVE NILAI FUZZY ==================
     private function resolveFuzzyValue(mixed $item)
@@ -145,7 +145,6 @@ class SensorController extends Controller
         if ($fotoData->isEmpty()) {
             return '<div class="foto-placeholder">📷 Belum ada foto dari kamera IoT.</div>';
         }
-
         $html = '<div class="foto-grid">';
         foreach ($fotoData as $fd) {
             $nilaiR = $this->resolveFuzzyValue($fd);
@@ -249,49 +248,59 @@ class SensorController extends Controller
     }
 
     // ==================================================================================
-    // FUZZY SUGENO — 4 Tahap
+    // FUZZY SUGENO — 4 Tahap (3-zona per parameter)
     //
-    // Membership suhu/udara/tanah diturunkan dari 6 nilai yang diatur admin:
-    // suhu_min, suhu_max, udara_min, udara_max, tanah_min, tanah_max.
-    // Lebar transisi (T_SUHU / T_LEMBAP) tetap konstan di kode.
+    // DESAIN BARU: admin mengatur 3 batas per parameter:
+    //   suhu_aman    → suhu ≤ ini masuk zona dingin (aman)
+    //   suhu_waspada → suhu di antara aman–waspada
+    //   suhu_hama    → suhu ≥ ini masuk zona panas (hama)
+    //   (sama untuk udara_ dan tanah_)
     //
-    // Untuk parameter X dengan batas ideal [min, max] dan lebar transisi T:
-    //   rendah(X) = clamp((min - X) / T, 0, 1)   → 1 jika X jauh di bawah min
-    //   tinggi(X) = clamp((X - max) / T, 0, 1)   → 1 jika X jauh di atas max
-    //   normal(X) = clamp(1 - rendah(X) - tinggi(X), 0, 1)
+    // Fungsi membership 3 zona:
+    //   rendah (dingin/kering) = clamp((X_aman    - X) / T, 0, 1)
+    //   tinggi (panas/lembap)  = clamp((X          - X_waspada) / (X_hama - X_waspada), 0, 1)
+    //   normal (hangat/normal) = clamp(1 - rendah - tinggi, 0, 1)
     //
-    // TAHAP 2 — 27 rules (firing_strength = min(anteseden), z = konstanta)
+    // TAHAP 2 — 27 rules sama seperti sebelumnya
     // TAHAP 3 — Defuzzifikasi Sugeno (Weighted Average)
-    // TAHAP 4 — getStatus() pakai threshold_hama / threshold_waspada (fixed di DB)
+    // TAHAP 4 — getStatus() pakai threshold_hama/waspada (fixed di DB, tidak diedit UI)
     // ==================================================================================
     private function fuzzySugeno(float $suhu, float $udara, float $tanah): float
     {
-        // ── Baca 6 nilai admin dari DB (via cache 1 jam) ──────────────────────────
-        $sMin = ThresholdSetting::getValue('suhu_min',  22);
-        $sMax = ThresholdSetting::getValue('suhu_max',  30);
-        $uMin = ThresholdSetting::getValue('udara_min', 60);
-        $uMax = ThresholdSetting::getValue('udara_max', 80);
-        $tMin = ThresholdSetting::getValue('tanah_min', 55);
-        $tMax = ThresholdSetting::getValue('tanah_max', 75);
+        // ── Baca 9 nilai dari DB (via cache 1 jam) ────────────────────────────────
+        $sAman    = ThresholdSetting::getValue('suhu_aman',    22);
+        $sWaspada = ThresholdSetting::getValue('suhu_waspada', 28);
+        $sHama    = ThresholdSetting::getValue('suhu_hama',    32);
 
-        // ── TAHAP 1A: Fungsi membership SUHU ──────────────────────────────────────
-        $dingin = max(0, min(1, ($sMin - $suhu) / self::T_SUHU));
-        $panas  = max(0, min(1, ($suhu - $sMax) / self::T_SUHU));
+        $uAman    = ThresholdSetting::getValue('udara_aman',    60);
+        $uWaspada = ThresholdSetting::getValue('udara_waspada', 75);
+        $uHama    = ThresholdSetting::getValue('udara_hama',    85);
+
+        $tAman    = ThresholdSetting::getValue('tanah_aman',    55);
+        $tWaspada = ThresholdSetting::getValue('tanah_waspada', 68);
+        $tHama    = ThresholdSetting::getValue('tanah_hama',    80);
+
+        // ── TAHAP 1A: Membership SUHU ─────────────────────────────────────────────
+        //   dingin: X ≤ sAman         → 1 (aman), turun ke 0 saat mendekati sWaspada
+        //   panas:  X ≥ sHama         → 1 (hama), naik dari 0 mulai sWaspada
+        //   hangat: antara keduanya   → zona waspada
+        $dingin = max(0, min(1, ($sAman    - $suhu) / self::T_SUHU));
+        $panas  = max(0, min(1, ($suhu  - $sWaspada) / max(0.01, $sHama - $sWaspada)));
         $hangat = max(0, min(1, 1 - $dingin - $panas));
 
-        // ── TAHAP 1B: Fungsi membership KELEMBAPAN UDARA ──────────────────────────
-        $kering_u = max(0, min(1, ($uMin - $udara) / self::T_LEMBAP));
-        $lembap_u = max(0, min(1, ($udara - $uMax) / self::T_LEMBAP));
+        // ── TAHAP 1B: Membership KELEMBAPAN UDARA ─────────────────────────────────
+        $kering_u = max(0, min(1, ($uAman    - $udara) / self::T_LEMBAP));
+        $lembap_u = max(0, min(1, ($udara - $uWaspada) / max(0.01, $uHama - $uWaspada)));
         $normal_u = max(0, min(1, 1 - $kering_u - $lembap_u));
 
-        // ── TAHAP 1C: Fungsi membership KELEMBAPAN TANAH ──────────────────────────
-        $kering_t = max(0, min(1, ($tMin - $tanah) / self::T_LEMBAP));
-        $lembap_t = max(0, min(1, ($tanah - $tMax) / self::T_LEMBAP));
+        // ── TAHAP 1C: Membership KELEMBAPAN TANAH ─────────────────────────────────
+        $kering_t = max(0, min(1, ($tAman    - $tanah) / self::T_LEMBAP));
+        $lembap_t = max(0, min(1, ($tanah - $tWaspada) / max(0.01, $tHama - $tWaspada)));
         $normal_t = max(0, min(1, 1 - $kering_t - $lembap_t));
 
         // ── TAHAP 2: EVALUASI 27 RULES ────────────────────────────────────────────
         $rules = [
-            // Suhu PANAS
+            // Suhu PANAS (risiko tinggi)
             [min($panas,  $lembap_u, $lembap_t), 1.00],
             [min($panas,  $lembap_u, $normal_t), 0.85],
             [min($panas,  $lembap_u, $kering_t), 0.75],
@@ -301,7 +310,7 @@ class SensorController extends Controller
             [min($panas,  $kering_u, $lembap_t), 0.50],
             [min($panas,  $kering_u, $normal_t), 0.40],
             [min($panas,  $kering_u, $kering_t), 0.30],
-            // Suhu HANGAT
+            // Suhu HANGAT (risiko sedang)
             [min($hangat, $lembap_u, $lembap_t), 0.80],
             [min($hangat, $lembap_u, $normal_t), 0.65],
             [min($hangat, $lembap_u, $kering_t), 0.55],
@@ -311,7 +320,7 @@ class SensorController extends Controller
             [min($hangat, $kering_u, $lembap_t), 0.35],
             [min($hangat, $kering_u, $normal_t), 0.25],
             [min($hangat, $kering_u, $kering_t), 0.20],
-            // Suhu DINGIN
+            // Suhu DINGIN (risiko rendah)
             [min($dingin, $lembap_u, $lembap_t), 0.45],
             [min($dingin, $lembap_u, $normal_t), 0.35],
             [min($dingin, $lembap_u, $kering_t), 0.25],
@@ -331,16 +340,14 @@ class SensorController extends Controller
         }
 
         if ($den == 0) {
-            Log::warning("Fuzzy: semua rules firing_strength = 0 — Suhu:{$suhu} Udara:{$udara} Tanah:{$tanah}");
+            Log::warning("Fuzzy: firing_strength=0 — Suhu:{$suhu} Udara:{$udara} Tanah:{$tanah}");
             return 0;
         }
 
-        return $num / $den; // nilai crisp 0.0–1.0
+        return $num / $den;
     }
 
-    // ── TAHAP 4: KEPUTUSAN ───────────────────────────────────────────
-    // threshold_hama (0.70) & threshold_waspada (0.45) tetap di DB sebagai
-    // nilai fixed (tidak ditampilkan/diedit di UI admin).
+    // ── TAHAP 4: KEPUTUSAN ────────────────────────────────────────────────────────
     private function getStatus(float $nilai): array
     {
         $th = ThresholdSetting::getValue('threshold_hama',    0.70);
@@ -483,9 +490,7 @@ class SensorController extends Controller
     }
 
     // ==================================================================================
-    // =============================== AREA ADMIN =======================================
-    //  Admin hanya mengatur 6 nilai: suhu_min/max, udara_min/max, tanah_min/max,
-    //  serta mengelola user (tambah & hapus).
+    // ADMIN
     // ==================================================================================
 
     public function adminDashboard()
@@ -501,30 +506,41 @@ class SensorController extends Controller
         return view('admin.dashboard', compact('totalData', 'totalHama', 'users', 'settings'));
     }
 
-    // ── Simpan 6 nilai min/max (suhu, udara, tanah) ───────────────────────
     public function updateThreshold(Request $request)
     {
         $request->validate([
-            'settings.suhu_min'  => 'required|numeric',
-            'settings.suhu_max'  => 'required|numeric',
-            'settings.udara_min' => 'required|numeric|between:0,100',
-            'settings.udara_max' => 'required|numeric|between:0,100',
-            'settings.tanah_min' => 'required|numeric|between:0,100',
-            'settings.tanah_max' => 'required|numeric|between:0,100',
+            'settings.suhu_aman'     => 'required|numeric',
+            'settings.suhu_waspada'  => 'required|numeric',
+            'settings.suhu_hama'     => 'required|numeric',
+            'settings.udara_aman'    => 'required|numeric|between:0,100',
+            'settings.udara_waspada' => 'required|numeric|between:0,100',
+            'settings.udara_hama'    => 'required|numeric|between:0,100',
+            'settings.tanah_aman'    => 'required|numeric|between:0,100',
+            'settings.tanah_waspada' => 'required|numeric|between:0,100',
+            'settings.tanah_hama'    => 'required|numeric|between:0,100',
         ]);
 
         $s = $request->input('settings');
 
-        // Validasi logis: setiap min harus < max
-        $pairs = [
-            'Suhu Udara'       => ['suhu_min',  'suhu_max'],
-            'Kelembapan Udara' => ['udara_min', 'udara_max'],
-            'Kelembapan Tanah' => ['tanah_min', 'tanah_max'],
+        // Validasi urutan: aman < waspada < hama
+        $params = [
+            'Suhu Udara'       => ['suhu_aman',  'suhu_waspada',  'suhu_hama'],
+            'Kelembapan Udara' => ['udara_aman', 'udara_waspada', 'udara_hama'],
+            'Kelembapan Tanah' => ['tanah_aman', 'tanah_waspada', 'tanah_hama'],
         ];
-        foreach ($pairs as $label => [$minKey, $maxKey]) {
-            if ((float) $s[$minKey] >= (float) $s[$maxKey]) {
+
+        foreach ($params as $label => [$kAman, $kWaspada, $kHama]) {
+            $vAman    = (float) $s[$kAman];
+            $vWaspada = (float) $s[$kWaspada];
+            $vHama    = (float) $s[$kHama];
+
+            if ($vAman >= $vWaspada) {
                 return back()->withInput()
-                    ->with('error', "Nilai Min {$label} harus lebih kecil dari Max {$label}.");
+                    ->with('error', "❌ {$label}: Batas AMAN harus lebih kecil dari batas WASPADA.");
+            }
+            if ($vWaspada >= $vHama) {
+                return back()->withInput()
+                    ->with('error', "❌ {$label}: Batas WASPADA harus lebih kecil dari batas HAMA.");
             }
         }
 
@@ -532,23 +548,18 @@ class SensorController extends Controller
             ThresholdSetting::where('key', $key)->update(['value' => (float) $value]);
         }
 
-        // Hapus cache agar kalkulasi Fuzzy Sugeno langsung memakai nilai baru
         ThresholdSetting::clearCache();
 
         return redirect()->route('admin.dashboard')
-            ->with('success', 'Pengaturan kondisi ideal berhasil diperbarui.');
+            ->with('success', '✅ Pengaturan kondisi ideal berhasil diperbarui.');
     }
 
-    // ── Kembalikan ke nilai default penelitian ────────────────────────────
     public function resetThreshold()
     {
         $defaults = [
-            'suhu_min'  => 22,
-            'suhu_max'  => 30,
-            'udara_min' => 60,
-            'udara_max' => 80,
-            'tanah_min' => 55,
-            'tanah_max' => 75,
+            'suhu_aman'     => 22, 'suhu_waspada'  => 28, 'suhu_hama'     => 32,
+            'udara_aman'    => 60, 'udara_waspada' => 75, 'udara_hama'    => 85,
+            'tanah_aman'    => 55, 'tanah_waspada' => 68, 'tanah_hama'    => 80,
         ];
 
         foreach ($defaults as $key => $value) {
@@ -558,10 +569,9 @@ class SensorController extends Controller
         ThresholdSetting::clearCache();
 
         return redirect()->route('admin.dashboard')
-            ->with('success', 'Pengaturan dikembalikan ke nilai default penelitian.');
+            ->with('success', '🔄 Pengaturan dikembalikan ke nilai default penelitian.');
     }
 
-    // ── Tambah pengguna baru ─────────────────────────────────────────
     public function storeUser(Request $request)
     {
         $request->validate([
@@ -574,25 +584,24 @@ class SensorController extends Controller
         User::create([
             'name'     => $request->name,
             'email'    => $request->email,
-            'password' => $request->password, // otomatis di-hash oleh cast 'hashed' pada model User
+            'password' => $request->password,
             'role'     => $request->role,
         ]);
 
         return redirect()->route('admin.dashboard')
-            ->with('success', 'Pengguna baru berhasil ditambahkan.');
+            ->with('success', '✅ Pengguna baru berhasil ditambahkan.');
     }
 
-    // ── Hapus pengguna ──────────────────────────────────────────────
     public function deleteUser(User $user)
     {
         if ($user->id === Auth::id()) {
             return redirect()->route('admin.dashboard')
-                ->with('error', 'Anda tidak dapat menghapus akun sendiri.');
+                ->with('error', 'Tidak dapat menghapus akun sendiri.');
         }
 
         $user->delete();
 
         return redirect()->route('admin.dashboard')
-            ->with('success', 'Pengguna berhasil dihapus.');
+            ->with('success', '🗑️ Pengguna berhasil dihapus.');
     }
 }
