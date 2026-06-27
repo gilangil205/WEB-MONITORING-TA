@@ -5,7 +5,7 @@
 @section('content')
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=400;500;600;700&family=JetBrains+Mono:wght=400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
     --hijau:      #16a34a;
@@ -64,7 +64,13 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
 .chip-aman    { background:#16a34a; color:white; }
 .chip-offline { background:#64748b; color:white; }
 
-.badge-live { position:absolute; top:12px; left:12px; background:#dc2626; color:white; font-size:10px; font-weight:700; letter-spacing:1px; padding:3px 9px; border-radius:4px; display:flex; align-items:center; gap:5px; z-index:10; }
+{{-- Badge LIVE — dikontrol visibility-nya oleh JS --}}
+.badge-live {
+    position:absolute; top:12px; left:12px;
+    background:#dc2626; color:white; font-size:10px; font-weight:700;
+    letter-spacing:1px; padding:3px 9px; border-radius:4px;
+    display:flex; align-items:center; gap:5px; z-index:10;
+}
 
 .cam-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:rgba(255,255,255,0.4); font-size:13px; height:100%; width:100%; }
 .cam-placeholder .ph-icon { font-size:48px; opacity:0.4; }
@@ -123,11 +129,14 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
         <h1>📷 Monitoring Visual Tanaman Jagung</h1>
         <p>Pemantauan kamera lapangan secara real-time disertai analisis deteksi hama berbasis Fuzzy Sugeno</p>
     </div>
-    @if($isOnline)
-        <div class="live-pill"><span class="live-dot"></span> LIVE MONITORING</div>
-    @else
-        <div class="offline-pill">📡 ALAT OFFLINE</div>
-    @endif
+    {{-- Pill header dikontrol JS — render awal dari PHP --}}
+    <div id="header-pill">
+        @if($isOnline)
+            <div class="live-pill"><span class="live-dot"></span> LIVE MONITORING</div>
+        @else
+            <div class="offline-pill">📡 ALAT OFFLINE</div>
+        @endif
+    </div>
 </div>
 
 {{-- ── MINI KARTU SENSOR ── --}}
@@ -199,13 +208,20 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
         <div class="panel-body">
 
             <div class="kamera-box" id="camBox">
-                <div class="badge-live">
+
+                {{--
+                    ✅ PERBAIKAN BUG: Badge LIVE sekarang dikontrol penuh oleh JavaScript.
+                    Render awal dari PHP hanya menentukan apakah badge tampil saat halaman pertama dibuka.
+                    Setelah itu, JS yang mengontrol show/hide badge ini setiap polling 5 detik.
+                    Sebelumnya: badge tidak pernah disembunyikan saat alat offline setelah page load.
+                --}}
+                <div class="badge-live" id="badge-live"
+                     style="{{ $isOnline ? '' : 'display:none;' }}">
                     <span style="width:6px;height:6px;background:white;border-radius:50%;display:inline-block;animation:blink 1s infinite;"></span>
                     LIVE
                 </div>
 
                 <div id="cam-content-wrapper" style="width:100%;height:100%;">
-                    {{-- Konten awal; akan diganti JS setelah polling pertama --}}
                     <div class="cam-placeholder">
                         <span class="ph-icon">📷</span>
                         <span>{{ $isOnline ? 'Memuat gambar dari kamera IoT...' : 'Alat IoT tidak terhubung' }}</span>
@@ -361,34 +377,41 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
 
 <script>
 // ── FETCH POLLING KAMERA (setiap 5 detik) ─────────────────────────────────────
-// Memanggil /api/kamera/latest yang membaca dari Cache (live IoT)
-// Jika alat offline → success:false → tampilkan indikator offline
 function fetchLatestCameraData() {
     fetch("{{ route('kamera.api') }}")
         .then(function(r) { return r.json(); })
         .then(function(data) {
 
             if (!data.success || !data.isOnline) {
-                // ── OFFLINE ───────────────────────────────────────────────
                 setKameraOffline();
                 return;
             }
 
-            // ── ONLINE: update semua elemen ───────────────────────────────
+            // ── ONLINE ────────────────────────────────────────────────────────
+
+            // ✅ PERBAIKAN: Tampilkan badge LIVE dan header pill saat online
+            var badgeLive = document.getElementById('badge-live');
+            if (badgeLive) badgeLive.style.display = 'flex';
+
+            var headerPill = document.getElementById('header-pill');
+            if (headerPill) headerPill.innerHTML =
+                '<div class="live-pill">' +
+                '  <span class="live-dot"></span> LIVE MONITORING' +
+                '</div>';
 
             // 1. Mini card nilai sensor
-            elSet('mini-suhu',       data.suhu);
-            elSet('mini-kel-udara',  data.kelembapan_udara);
-            elSet('mini-kel-tanah',  data.kelembapan_tanah);
-            elSet('detail-suhu',     data.suhu + ' °C');
-            elSet('detail-kel-udara',data.kelembapan_udara + ' %');
-            elSet('detail-kel-tanah',data.kelembapan_tanah + ' %');
-            elSet('detail-time',     data.formatted_time);
+            elSet('mini-suhu',        data.suhu);
+            elSet('mini-kel-udara',   data.kelembapan_udara);
+            elSet('mini-kel-tanah',   data.kelembapan_tanah);
+            elSet('detail-suhu',      data.suhu + ' °C');
+            elSet('detail-kel-udara', data.kelembapan_udara + ' %');
+            elSet('detail-kel-tanah', data.kelembapan_tanah + ' %');
+            elSet('detail-time',      data.formatted_time);
 
             // 2. Mini card status
-            var miniCard  = document.getElementById('mini-card-status');
-            var miniIcon  = document.getElementById('mini-icon-status');
-            var miniVal   = document.getElementById('mini-val-status');
+            var miniCard = document.getElementById('mini-card-status');
+            var miniIcon = document.getElementById('mini-icon-status');
+            var miniVal  = document.getElementById('mini-val-status');
             if (miniVal) miniVal.innerText = data.status;
             if (miniCard) {
                 miniCard.className = 'mini-card';
@@ -402,25 +425,27 @@ function fetchLatestCameraData() {
                 else                                miniIcon.innerText = '✅';
             }
 
-            // 3. Kamera box (gambar)
-            var contentWrapper = document.getElementById('cam-content-wrapper');
-            if (contentWrapper) {
+            // 3. Kamera box (gambar dari ESP32-CAM)
+            // data.image = URL lengkap foto terbaru dari cache (kiriman IoT terakhir)
+            var cw = document.getElementById('cam-content-wrapper');
+            if (cw) {
                 if (data.image) {
-                    var chipClass = data.status === 'HAMA' ? 'chip-hama' : (data.status === 'WASPADA' ? 'chip-waspada' : 'chip-aman');
-                    // Tambahkan cache-buster agar browser tidak pakai gambar lama
+                    var chipClass = data.status === 'HAMA' ? 'chip-hama'
+                                 : (data.status === 'WASPADA' ? 'chip-waspada' : 'chip-aman');
+                    // Cache-buster agar browser tidak pakai gambar lama
                     var imageUrl = data.image + '?t=' + Date.now();
-                    contentWrapper.innerHTML =
+                    cw.innerHTML =
                         '<img src="' + imageUrl + '" alt="Gambar tanaman jagung dari kamera IoT">' +
                         '<div class="cam-overlay">' +
                         '  <span class="cam-timestamp">' + data.formatted_timestamp + '</span>' +
                         '  <span class="cam-status-chip ' + chipClass + '">' + data.status + '</span>' +
                         '</div>';
                 } else {
-                    contentWrapper.innerHTML =
+                    cw.innerHTML =
                         '<div class="cam-placeholder">' +
                         '  <span class="ph-icon">📷</span>' +
                         '  <span>Belum ada gambar dari kamera IoT</span>' +
-                        '  <span style="font-size:11px;opacity:0.6;">Gambar akan tampil saat sensor mengirim data</span>' +
+                        '  <span style="font-size:11px;opacity:0.6;">Gambar akan tampil saat ESP32-CAM mengirim foto</span>' +
                         '</div>';
                 }
             }
@@ -434,31 +459,31 @@ function fetchLatestCameraData() {
 
             if (panelBesar) panelBesar.className = 'status-besar';
             if (sbVal)      sbVal.className      = 'sb-val';
-
-            if (sbFuzzy) sbFuzzy.innerText = 'Fuzzy: ' + parseFloat(data.nilai).toFixed(4);
+            if (sbFuzzy)    sbFuzzy.innerText    = 'Fuzzy: ' + parseFloat(data.nilai).toFixed(4);
 
             if (data.status === 'HAMA') {
                 if (panelBesar) panelBesar.classList.add('hama');
-                if (sbVal)      { sbVal.classList.add('hama'); sbVal.innerText = 'HAMA TERDETEKSI'; }
-                if (sbIcon)     sbIcon.innerText = '🚨';
-                if (sbDesc)     sbDesc.innerText = 'Nilai Fuzzy Sugeno ≥ 0.70. Kondisi lingkungan sangat mendukung perkembangan hama pada tanaman jagung.';
+                if (sbVal)  { sbVal.classList.add('hama');    sbVal.innerText = 'HAMA TERDETEKSI'; }
+                if (sbIcon)   sbIcon.innerText = '🚨';
+                if (sbDesc)   sbDesc.innerText = 'Nilai Fuzzy Sugeno ≥ 0.70. Kondisi lingkungan sangat mendukung perkembangan hama pada tanaman jagung.';
             } else if (data.status === 'WASPADA') {
                 if (panelBesar) panelBesar.classList.add('waspada');
-                if (sbVal)      { sbVal.classList.add('waspada'); sbVal.innerText = 'PERLU WASPADA'; }
-                if (sbIcon)     sbIcon.innerText = '⚠️';
-                if (sbDesc)     sbDesc.innerText = 'Nilai Fuzzy Sugeno 0.45–0.70. Kondisi mulai memungkinkan munculnya hama. Pantau secara intensif.';
+                if (sbVal)  { sbVal.classList.add('waspada'); sbVal.innerText = 'PERLU WASPADA'; }
+                if (sbIcon)   sbIcon.innerText = '⚠️';
+                if (sbDesc)   sbDesc.innerText = 'Nilai Fuzzy Sugeno 0.45–0.70. Kondisi mulai memungkinkan munculnya hama. Pantau secara intensif.';
             } else {
                 if (panelBesar) panelBesar.classList.add('aman');
-                if (sbVal)      { sbVal.classList.add('aman'); sbVal.innerText = 'TANAMAN AMAN'; }
-                if (sbIcon)     sbIcon.innerText = '🌿';
-                if (sbDesc)     sbDesc.innerText = 'Nilai Fuzzy Sugeno < 0.45. Kondisi tidak mendukung perkembangan hama. Pertahankan kondisi saat ini.';
+                if (sbVal)  { sbVal.classList.add('aman');    sbVal.innerText = 'TANAMAN AMAN'; }
+                if (sbIcon)   sbIcon.innerText = '🌿';
+                if (sbDesc)   sbDesc.innerText = 'Nilai Fuzzy Sugeno < 0.45. Kondisi tidak mendukung perkembangan hama. Pertahankan kondisi saat ini.';
             }
 
             // 5. Rekomendasi tindakan
             var rekList = document.getElementById('rekomendasi-list');
             if (rekList && data.rekomendasi) {
                 rekList.innerHTML = '';
-                var numClass = data.status === 'HAMA' ? 'num-hama' : (data.status === 'WASPADA' ? 'num-waspada' : 'num-aman');
+                var numClass = data.status === 'HAMA' ? 'num-hama'
+                             : (data.status === 'WASPADA' ? 'num-waspada' : 'num-aman');
                 data.rekomendasi.forEach(function(aksi, idx) {
                     var li = document.createElement('li');
                     li.innerHTML = '<span class="aksi-num ' + numClass + '">' + (idx + 1) + '</span> ' + aksi;
@@ -466,7 +491,7 @@ function fetchLatestCameraData() {
                 });
             }
 
-            // 6. Riwayat foto
+            // 6. Riwayat foto (5 foto terbaru dari DB yang punya gambar)
             var riwayatWrapper = document.getElementById('riwayat-foto-wrapper');
             if (riwayatWrapper && data.riwayat_html) {
                 riwayatWrapper.innerHTML = data.riwayat_html;
@@ -477,8 +502,16 @@ function fetchLatestCameraData() {
         });
 }
 
-// ── Tampilan OFFLINE untuk halaman kamera ─────────────────────────────────────
+// ── Tampilan OFFLINE ────────────────────────────────────────────────────────────
 function setKameraOffline() {
+    // ✅ PERBAIKAN: Sembunyikan badge LIVE dan ganti header pill saat offline
+    var badgeLive = document.getElementById('badge-live');
+    if (badgeLive) badgeLive.style.display = 'none';
+
+    var headerPill = document.getElementById('header-pill');
+    if (headerPill) headerPill.innerHTML =
+        '<div class="offline-pill">📡 ALAT OFFLINE</div>';
+
     // Mini card sensor → tampilkan --
     ['mini-suhu','mini-kel-udara','mini-kel-tanah'].forEach(function(id) {
         var e = document.getElementById(id); if (e) e.innerText = '--';
@@ -487,7 +520,6 @@ function setKameraOffline() {
         var e = document.getElementById(id); if (e) e.innerText = '--';
     });
 
-    // Mini card status
     var miniCard = document.getElementById('mini-card-status');
     var miniIcon = document.getElementById('mini-icon-status');
     var miniVal  = document.getElementById('mini-val-status');
@@ -495,7 +527,6 @@ function setKameraOffline() {
     if (miniIcon) miniIcon.innerText = '📡';
     if (miniVal)  miniVal.innerText  = 'OFFLINE';
 
-    // Kamera box
     var cw = document.getElementById('cam-content-wrapper');
     if (cw) cw.innerHTML =
         '<div class="cam-placeholder">' +
@@ -504,7 +535,6 @@ function setKameraOffline() {
         '  <span style="font-size:11px;opacity:0.6;">Gambar akan tampil saat perangkat kembali online</span>' +
         '</div>';
 
-    // Panel status besar
     var panelBesar = document.getElementById('panel-status-besar');
     var sbIcon     = document.getElementById('sb-icon');
     var sbVal      = document.getElementById('sb-val');
@@ -512,11 +542,10 @@ function setKameraOffline() {
     var sbDesc     = document.getElementById('sb-desc');
     if (panelBesar) panelBesar.className = 'status-besar offline';
     if (sbIcon)     sbIcon.innerText     = '📡';
-    if (sbVal)      { sbVal.className = 'sb-val offline'; sbVal.innerText = 'ALAT OFFLINE'; }
+    if (sbVal)      { sbVal.className    = 'sb-val offline'; sbVal.innerText = 'ALAT OFFLINE'; }
     if (sbFuzzy)    sbFuzzy.innerText    = 'Fuzzy: --';
     if (sbDesc)     sbDesc.innerText     = 'Perangkat IoT sedang tidak terhubung. Periksa koneksi jaringan ESP32.';
 
-    // Rekomendasi
     var rekList = document.getElementById('rekomendasi-list');
     if (rekList) rekList.innerHTML =
         '<li><span class="aksi-num num-aman">!</span> Periksa koneksi jaringan perangkat IoT.</li>' +

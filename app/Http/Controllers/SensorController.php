@@ -197,32 +197,22 @@ class SensorController extends Controller
             'updated_at'       => now()->toIso8601String(),
         ], now()->addMinutes(7));
 
-        $dbSaved = false;
-        if (!Cache::has('iot_db_cooldown')) {
-            $now         = Carbon::now();
-            $minute      = floor($now->minute / 15) * 15;
-            $timeRounded = $now->copy()->setMinute($minute)->setSecond(0);
-
-            SensorReading::create([
-                'suhu'             => $request->suhu_udara,
-                'kelembapan_udara' => $request->kelembapan_udara,
-                'kelembapan_tanah' => $request->kelembapan_tanah,
-                'nilai_fuzzy'      => $nilai,
-                'image'            => $path,
-                'deteksi'          => $status,
-                'created_at'       => $timeRounded,
-            ]);
-
-            Cache::put('iot_db_cooldown', true, now()->addSeconds(890));
-            $dbSaved = true;
-        }
+        // ✅ SIMPAN KE DATABASE SETIAP KALI (tanpa cooldown 15 menit)
+        SensorReading::create([
+            'suhu'             => $request->suhu_udara,
+            'kelembapan_udara' => $request->kelembapan_udara,
+            'kelembapan_tanah' => $request->kelembapan_tanah,
+            'nilai_fuzzy'      => $nilai,
+            'image'            => $path,
+            'deteksi'          => $status,
+        ]);
 
         return response()->json([
             'message'            => 'Data diproses',
             'status'             => $status,
             'nilai'              => round($nilai, 4),
             'stored_in_cache'    => true,
-            'stored_in_database' => $dbSaved,
+            'stored_in_database' => true, // selalu true karena disimpan setiap kiriman
         ], 201);
     }
 

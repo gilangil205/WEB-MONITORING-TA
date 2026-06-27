@@ -116,9 +116,10 @@
                     </td>
 
                     <td>
+                        {{-- ✅ PERBAIKAN: Gunakan 'HAMA' dan 'WASPADA' sesuai logika Fuzzy --}}
                         <span class="
-                            {{ $item->status == 'TINGGI' ? 'status-high' :
-                               ($item->status == 'SEDANG' ? 'status-medium' : 'status-low') }}">
+                            {{ $item->status == 'HAMA' ? 'status-high' :
+                               ($item->status == 'WASPADA' ? 'status-medium' : 'status-low') }}">
                             {{ $item->status }}
                         </span>
                     </td>
