@@ -259,6 +259,30 @@
         .popup-box button { margin-top:18px; padding:10px 24px; border:none; background:#ef4444; color:white; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; font-family:var(--font); transition:background 0.15s; }
         .popup-box button:hover { background:#dc2626; }
 
+        /* ── NOTIFIKASI ── */
+        #notification-area {
+            z-index: 1000;
+        }
+        #notification-dropdown {
+            display: none;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            border: 1px solid #e2e8f0;
+            max-height: 420px;
+            overflow-y: auto;
+        }
+        #notification-dropdown::-webkit-scrollbar {
+            width: 4px;
+        }
+        #notification-dropdown::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .notif-item:hover {
+            background: #f1f5f9 !important;
+        }
+
         @media (max-width:900px) {
             .sensor-grid  { grid-template-columns:repeat(2,1fr); }
             .mini-grid    { grid-template-columns:repeat(2,1fr); }
@@ -429,7 +453,32 @@
         </div>
     @endif
 
+    {{-- NOTIFIKASI LONCENG --}}
+    <div id="notification-area" style="position:fixed; top:80px; right:20px; z-index:1000; max-width:380px; width:100%;">
+        <div style="position:relative; display:flex; justify-content:flex-end;">
+            <button id="notification-toggle" style="background:white; border:none; border-radius:50%; width:48px; height:48px; box-shadow:0 4px 12px rgba(0,0,0,0.15); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:24px; position:relative;">
+                🔔
+                <span id="notif-badge" style="position:absolute; top:-4px; right:-4px; background:#ef4444; color:white; font-size:11px; font-weight:700; border-radius:50%; min-width:22px; height:22px; display:flex; align-items:center; justify-content:center; padding:0 5px; border:2px solid white;">
+                    0
+                </span>
+            </button>
+            <div id="notification-dropdown" style="display:none; position:absolute; top:56px; right:0; background:white; border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.15); width:360px; max-height:420px; overflow-y:auto; border:1px solid #e2e8f0;">
+                <div style="padding:12px 16px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:700; font-size:14px; color:#0f172a;">📬 Notifikasi</span>
+                    <button id="mark-all-read-btn" style="background:none; border:none; color:#3b82f6; font-size:12px; cursor:pointer; font-weight:600;">Tandai semua sudah dibaca</button>
+                </div>
+                <div id="notif-list">
+                    <div style="padding:20px; text-align:center; color:#94a3b8; font-size:13px;">Tidak ada notifikasi</div>
+                </div>
+                <div style="padding:10px 16px; border-top:1px solid #e2e8f0; text-align:center;">
+                    <a href="{{ route('riwayat') }}" style="font-size:12px; color:#3b82f6; text-decoration:none; font-weight:600;">Lihat semua riwayat →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     @yield('content')
+
 </div>
 
 <div id="popupWarning" class="popup-warning">
@@ -473,6 +522,164 @@
         if (status === 'HAMA' && !popupHidden) showPopup();
         if (status !== 'HAMA') localStorage.removeItem('popup_hidden');
     });
+</script>
+
+<script>
+// ── NOTIFIKASI ──
+(function() {
+    const toggleBtn = document.getElementById('notification-toggle');
+    const dropdown = document.getElementById('notification-dropdown');
+    const notifList = document.getElementById('notif-list');
+    const badge = document.getElementById('notif-badge');
+    const markAllBtn = document.getElementById('mark-all-read-btn');
+    let isOpen = false;
+    let lastNotifCount = 0;
+
+    // Toggle dropdown
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            isOpen = !isOpen;
+            dropdown.style.display = isOpen ? 'block' : 'none';
+            if (isOpen) {
+                loadNotifications();
+            }
+        });
+    }
+
+    // Tutup dropdown saat klik di luar
+    document.addEventListener('click', function(e) {
+        if (isOpen && !dropdown.contains(e.target) && e.target !== toggleBtn) {
+            isOpen = false;
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Load notifikasi via AJAX
+    function loadNotifications() {
+        fetch('/notifications?unread_only=false')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    renderNotifications(data.data);
+                    updateBadge(data.unread_count);
+                }
+            })
+            .catch(err => console.error('Gagal load notifikasi:', err));
+    }
+
+    // Render daftar notifikasi
+    function renderNotifications(notifs) {
+        if (!notifs || notifs.length === 0) {
+            notifList.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8; font-size:13px;">Tidak ada notifikasi</div>';
+            return;
+        }
+
+        let html = '';
+        notifs.forEach(notif => {
+            const statusColor = notif.status === 'HAMA' ? '#dc2626' : (notif.status === 'WASPADA' ? '#d97706' : '#16a34a');
+            const bgColor = notif.is_read ? '#f8fafc' : 'white';
+            const borderLeft = notif.is_read ? '3px solid #e2e8f0' : '3px solid ' + statusColor;
+
+            html += `
+                <div class="notif-item" data-id="${notif.id}" style="padding:12px 16px; border-bottom:1px solid #f1f5f9; background:${bgColor}; border-left:${borderLeft}; cursor:pointer; transition:background 0.15s; ${notif.is_read ? 'opacity:0.7;' : ''}">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div style="flex:1;">
+                            <div style="font-weight:600; font-size:13px; color:#0f172a;">${notif.title}</div>
+                            <div style="font-size:12px; color:#475569; margin-top:4px;">${notif.message}</div>
+                            <div style="font-size:10px; color:#94a3b8; margin-top:6px; display:flex; gap:12px;">
+                                <span>${notif.created_at}</span>
+                                ${notif.fuzzy_value ? `<span>Nilai: ${notif.fuzzy_value}</span>` : ''}
+                                ${notif.is_read ? '<span style="color:#94a3b8;">✓ Sudah dibaca</span>' : '<span style="color:#3b82f6;">● Baru</span>'}
+                            </div>
+                        </div>
+                        ${!notif.is_read ? `
+                            <button class="mark-read-btn" data-id="${notif.id}" style="background:none; border:none; color:#3b82f6; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; margin-left:8px;">Tandai dibaca</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        });
+
+        notifList.innerHTML = html;
+
+        // Event listener untuk mark as read per item
+        document.querySelectorAll('.mark-read-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const id = this.dataset.id;
+                markAsRead(id);
+            });
+        });
+
+        // Event listener untuk klik item (buka detail atau mark as read)
+        document.querySelectorAll('.notif-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const id = this.dataset.id;
+                // Jika belum dibaca, tandai dibaca
+                if (!this.querySelector('.mark-read-btn')) return;
+                markAsRead(id);
+            });
+        });
+    }
+
+    // Mark one notification as read
+    function markAsRead(id) {
+        fetch('/notifications/' + id + '/read', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    loadNotifications(); // reload
+                }
+            })
+            .catch(err => console.error('Gagal tandai dibaca:', err));
+    }
+
+    // Mark all as read
+    if (markAllBtn) {
+        markAllBtn.addEventListener('click', function() {
+            fetch('/notifications/mark-all-read', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' } })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        loadNotifications();
+                    }
+                })
+                .catch(err => console.error('Gagal tandai semua:', err));
+        });
+    }
+
+    // Update badge
+    function updateBadge(count) {
+        if (badge) {
+            badge.textContent = count > 0 ? count : '0';
+            badge.style.display = count > 0 ? 'flex' : 'flex';
+        }
+        lastNotifCount = count;
+    }
+
+    // Polling setiap 30 detik
+    setInterval(function() {
+        fetch('/notifications?unread_only=true')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const newCount = data.unread_count;
+                    if (newCount !== lastNotifCount) {
+                        updateBadge(newCount);
+                        // Jika dropdown terbuka, reload
+                        if (isOpen) {
+                            loadNotifications();
+                        }
+                    }
+                }
+            })
+            .catch(err => console.error('Gagal polling notifikasi:', err));
+    }, 30000);
+
+    // Load awal
+    loadNotifications();
+})();
 </script>
 </body>
 </html>

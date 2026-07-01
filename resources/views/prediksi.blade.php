@@ -138,12 +138,20 @@
             </tbody>
         </table>
 
-        {{-- Keterangan threshold --}}
+        {{-- ✅ PERBAIKAN: Keterangan threshold dinamis dari DB (bukan hardcode) --}}
+        {{-- Sebelumnya: 0.70 dan 0.45 ditulis langsung di HTML                 --}}
+        {{-- Sekarang  : dibaca dari variabel $thresholdHama & $thresholdWaspada --}}
         <div style="margin-top:16px;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:12px;">
             <p><b>Keterangan Threshold Fuzzy Sugeno:</b></p>
-            <p style="margin-top:4px;">🔴 <b>HAMA</b> &nbsp;&nbsp;: Nilai &ge; 0.70</p>
-            <p style="margin-top:2px;">🟡 <b>WASPADA</b> : 0.45 &le; Nilai &lt; 0.70</p>
-            <p style="margin-top:2px;">🟢 <b>AMAN</b> &nbsp;&nbsp;: Nilai &lt; 0.45</p>
+            <p style="margin-top:4px;">
+                🔴 <b>HAMA</b> &nbsp;&nbsp;: Nilai &ge; {{ number_format($thresholdHama, 2) }}
+            </p>
+            <p style="margin-top:2px;">
+                🟡 <b>WASPADA</b> : {{ number_format($thresholdWaspada, 2) }} &le; Nilai &lt; {{ number_format($thresholdHama, 2) }}
+            </p>
+            <p style="margin-top:2px;">
+                🟢 <b>AMAN</b> &nbsp;&nbsp;: Nilai &lt; {{ number_format($thresholdWaspada, 2) }}
+            </p>
             <p style="margin-top:8px;color:#94a3b8;">ℹ️ Data historis tersimpan ke DB setiap 15 menit. Grafik live dari Cache IoT (setiap 5 menit).</p>
         </div>
     </div>
@@ -155,6 +163,10 @@
 var labelsHistoris = @json($labelsHistoris);
 var fuzzyHistoris  = @json($fuzzyValues);
 var prediksiValues = @json($prediksi);
+
+/* ── THRESHOLD DARI SERVER (untuk garis referensi di chart) ── */
+var thHama    = {{ $thresholdHama }};
+var thWaspada = {{ $thresholdWaspada }};
 
 /* ── GABUNGKAN LABEL ── */
 var allLabels = labelsHistoris.concat(['+15 Mnt', '+30 Mnt', '+45 Mnt']);
@@ -206,6 +218,23 @@ new Chart(ctx, {
         maintainAspectRatio: false,
         plugins: {
             legend: { display: true, position: 'top' },
+            // ✅ PERBAIKAN: annotation garis threshold menggunakan nilai dinamis
+            annotation: {
+                annotations: {
+                    lineHama: {
+                        type: 'line', yMin: thHama, yMax: thHama,
+                        borderColor: 'rgba(220,38,38,0.5)', borderWidth: 1.5,
+                        borderDash: [4, 3],
+                        label: { content: 'HAMA ≥ ' + thHama.toFixed(2), display: true, position: 'end', font: { size: 10 } }
+                    },
+                    lineWaspada: {
+                        type: 'line', yMin: thWaspada, yMax: thWaspada,
+                        borderColor: 'rgba(217,119,6,0.5)', borderWidth: 1.5,
+                        borderDash: [4, 3],
+                        label: { content: 'WASPADA ≥ ' + thWaspada.toFixed(2), display: true, position: 'end', font: { size: 10 } }
+                    }
+                }
+            },
             tooltip: {
                 callbacks: {
                     label: function (ctx) {
@@ -232,7 +261,6 @@ function perbaruiPrediksiCard() {
         .then(function(data) {
             var isOnline = data.isOnline === true;
 
-            // Kartu atas
             var elSuhu   = document.getElementById('pred-suhu');
             var elUdara  = document.getElementById('pred-udara');
             var elTanah  = document.getElementById('pred-tanah');

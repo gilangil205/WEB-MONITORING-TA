@@ -6,19 +6,18 @@ use Illuminate\Http\Request;
 use App\Models\SensorReading;
 use App\Models\ThresholdSetting;
 use App\Models\User;
+use App\Models\Notification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Collection;
 
 class SensorController extends Controller
 {
-    // ── Lebar transisi fuzzy (°C / %) — TIDAK diatur admin ─────────────────
-    // Menentukan seberapa "landai" perubahan derajat keanggotaan
-    // di sekitar batas zona yang diatur admin.
-    private const T_SUHU   = 3;   // °C  — transisi antar zona suhu
-    private const T_LEMBAP = 5;   // %   — transisi antar zona kelembapan
+    private const T_SUHU   = 3;
+    private const T_LEMBAP = 5;
 
     // ================== HELPER: RESOLVE NILAI FUZZY ==================
     private function resolveFuzzyValue(mixed $item)
@@ -43,9 +42,36 @@ class SensorController extends Controller
         return $statusGlobal;
     }
 
-    // ==================================================================================
-    // ENDPOINT: /live-data
-    // ==================================================================================
+    // ================== HELPER: BUAT NOTIFIKASI ==================
+    private function createNotification(string $status, float $nilai, ?SensorReading $sensor = null)
+    {
+        // Dapatkan semua user (atau bisa difilter hanya user aktif)
+        $users = User::whereIn('role', ['user', 'admin'])->get();
+
+        if ($status === 'HAMA') {
+            $title = '🚨 Peringatan Hama Terdeteksi!';
+            $message = "Sistem mendeteksi risiko serangan hama tinggi dengan nilai fuzzy {$nilai}. Segera periksa kondisi tanaman jagung Anda.";
+        } elseif ($status === 'WASPADA') {
+            $title = '⚠️ Status Waspada Hama';
+            $message = "Kondisi lingkungan mulai mengarah ke risiko hama (nilai fuzzy {$nilai}). Tingkatkan frekuensi monitoring.";
+        } else {
+            return; // Hanya buat notifikasi untuk HAMA dan WASPADA
+        }
+
+        foreach ($users as $user) {
+            Notification::create([
+                'user_id' => $user->id,
+                'title' => $title,
+                'message' => $message,
+                'status' => $status,
+                'fuzzy_value' => $nilai,
+                'sensor_reading_id' => $sensor?->id,
+                'is_read' => false,
+            ]);
+        }
+    }
+
+    // ================== ENDPOINT: /live-data ==================
     public function liveData()
     {
         if (Cache::has('iot_live_data')) {
@@ -82,9 +108,7 @@ class SensorController extends Controller
         ]);
     }
 
-    // ==================================================================================
-    // ENDPOINT: /api/kamera/latest
-    // ==================================================================================
+    // ================== ENDPOINT: /api/kamera/latest ==================
     public function kameraLatest()
     {
         if (Cache::has('iot_live_data')) {
@@ -158,9 +182,7 @@ class SensorController extends Controller
         return $html . '</div>';
     }
 
-    // ==================================================================================
-    // ENDPOINT: POST /api/sensor — terima data dari IoT (ESP32)
-    // ==================================================================================
+    // ================== ENDPOINT: POST /api/sensor ==================
     public function store(Request $request)
     {
         $token = $request->header('X-API-TOKEN') ?? $request->input('api_token');
@@ -197,8 +219,7 @@ class SensorController extends Controller
             'updated_at'       => now()->toIso8601String(),
         ], now()->addMinutes(7));
 
-        // ✅ SIMPAN KE DATABASE SETIAP KALI (tanpa cooldown 15 menit)
-        SensorReading::create([
+        $sensor = SensorReading::create([
             'suhu'             => $request->suhu_udara,
             'kelembapan_udara' => $request->kelembapan_udara,
             'kelembapan_tanah' => $request->kelembapan_tanah,
@@ -207,26 +228,48 @@ class SensorController extends Controller
             'deteksi'          => $status,
         ]);
 
+        // ✅ Buat notifikasi jika status HAMA atau WASPADA
+        if (in_array($status, ['HAMA', 'WASPADA'])) {
+            $this->createNotification($status, $nilai, $sensor);
+        }
+
         return response()->json([
             'message'            => 'Data diproses',
             'status'             => $status,
             'nilai'              => round($nilai, 4),
             'stored_in_cache'    => true,
-            'stored_in_database' => true, // selalu true karena disimpan setiap kiriman
+            'stored_in_database' => true,
         ], 201);
     }
 
-    // ================== MANUAL ==================
+    // ================== MANUAL (AMBIL DATA REAL-TIME) ==================
     public function manual()
     {
-        $suhu  = rand(22, 36);
-        $udara = rand(55, 95);
-        $tanah = rand(35, 90);
+        // ✅ AMBIL DATA REAL-TIME DARI CACHE
+        if (Cache::has('iot_live_data')) {
+            $cache = Cache::get('iot_live_data');
+            $suhu  = $cache['suhu'] ?? 0;
+            $udara = $cache['kelembapan_udara'] ?? 0;
+            $tanah = $cache['kelembapan_tanah'] ?? 0;
+        } else {
+            // Jika cache kosong, ambil data terakhir dari database
+            $latest = SensorReading::latest()->first();
+            if ($latest) {
+                $suhu  = $latest->suhu;
+                $udara = $latest->kelembapan_udara;
+                $tanah = $latest->kelembapan_tanah;
+            } else {
+                // Jika tidak ada data sama sekali, beri pesan error
+                return redirect()->route('dashboard')
+                    ->with('error', '❌ Belum ada data sensor. Tunggu kiriman data dari IoT atau gunakan mode simulasi.');
+            }
+        }
 
+        // Hitung ulang fuzzy dengan data real-time
         $nilai = $this->fuzzySugeno($suhu, $udara, $tanah);
         [$status] = $this->getStatus($nilai);
 
-        SensorReading::create([
+        $sensor = SensorReading::create([
             'suhu'             => $suhu,
             'kelembapan_udara' => $udara,
             'kelembapan_tanah' => $tanah,
@@ -234,30 +277,20 @@ class SensorController extends Controller
             'deteksi'          => $status,
         ]);
 
-        return redirect()->route('dashboard')->with('success', 'Data manual berhasil ditambahkan');
+        // ✅ Buat notifikasi jika status HAMA atau WASPADA
+        if (in_array($status, ['HAMA', 'WASPADA'])) {
+            $this->createNotification($status, $nilai, $sensor);
+        }
+
+        return redirect()->route('dashboard')
+            ->with('success', '✅ Data real-time berhasil disimpan ke database!');
     }
 
     // ==================================================================================
-    // FUZZY SUGENO — 4 Tahap (3-zona per parameter)
-    //
-    // DESAIN BARU: admin mengatur 3 batas per parameter:
-    //   suhu_aman    → suhu ≤ ini masuk zona dingin (aman)
-    //   suhu_waspada → suhu di antara aman–waspada
-    //   suhu_hama    → suhu ≥ ini masuk zona panas (hama)
-    //   (sama untuk udara_ dan tanah_)
-    //
-    // Fungsi membership 3 zona:
-    //   rendah (dingin/kering) = clamp((X_aman    - X) / T, 0, 1)
-    //   tinggi (panas/lembap)  = clamp((X          - X_waspada) / (X_hama - X_waspada), 0, 1)
-    //   normal (hangat/normal) = clamp(1 - rendah - tinggi, 0, 1)
-    //
-    // TAHAP 2 — 27 rules sama seperti sebelumnya
-    // TAHAP 3 — Defuzzifikasi Sugeno (Weighted Average)
-    // TAHAP 4 — getStatus() pakai threshold_hama/waspada (fixed di DB, tidak diedit UI)
+    // FUZZY SUGENO
     // ==================================================================================
     private function fuzzySugeno(float $suhu, float $udara, float $tanah): float
     {
-        // ── Baca 9 nilai dari DB (via cache 1 jam) ────────────────────────────────
         $sAman    = ThresholdSetting::getValue('suhu_aman',    22);
         $sWaspada = ThresholdSetting::getValue('suhu_waspada', 28);
         $sHama    = ThresholdSetting::getValue('suhu_hama',    32);
@@ -270,27 +303,19 @@ class SensorController extends Controller
         $tWaspada = ThresholdSetting::getValue('tanah_waspada', 68);
         $tHama    = ThresholdSetting::getValue('tanah_hama',    80);
 
-        // ── TAHAP 1A: Membership SUHU ─────────────────────────────────────────────
-        //   dingin: X ≤ sAman         → 1 (aman), turun ke 0 saat mendekati sWaspada
-        //   panas:  X ≥ sHama         → 1 (hama), naik dari 0 mulai sWaspada
-        //   hangat: antara keduanya   → zona waspada
         $dingin = max(0, min(1, ($sAman    - $suhu) / self::T_SUHU));
         $panas  = max(0, min(1, ($suhu  - $sWaspada) / max(0.01, $sHama - $sWaspada)));
         $hangat = max(0, min(1, 1 - $dingin - $panas));
 
-        // ── TAHAP 1B: Membership KELEMBAPAN UDARA ─────────────────────────────────
         $kering_u = max(0, min(1, ($uAman    - $udara) / self::T_LEMBAP));
         $lembap_u = max(0, min(1, ($udara - $uWaspada) / max(0.01, $uHama - $uWaspada)));
         $normal_u = max(0, min(1, 1 - $kering_u - $lembap_u));
 
-        // ── TAHAP 1C: Membership KELEMBAPAN TANAH ─────────────────────────────────
         $kering_t = max(0, min(1, ($tAman    - $tanah) / self::T_LEMBAP));
         $lembap_t = max(0, min(1, ($tanah - $tWaspada) / max(0.01, $tHama - $tWaspada)));
         $normal_t = max(0, min(1, 1 - $kering_t - $lembap_t));
 
-        // ── TAHAP 2: EVALUASI 27 RULES ────────────────────────────────────────────
         $rules = [
-            // Suhu PANAS (risiko tinggi)
             [min($panas,  $lembap_u, $lembap_t), 1.00],
             [min($panas,  $lembap_u, $normal_t), 0.85],
             [min($panas,  $lembap_u, $kering_t), 0.75],
@@ -300,7 +325,6 @@ class SensorController extends Controller
             [min($panas,  $kering_u, $lembap_t), 0.50],
             [min($panas,  $kering_u, $normal_t), 0.40],
             [min($panas,  $kering_u, $kering_t), 0.30],
-            // Suhu HANGAT (risiko sedang)
             [min($hangat, $lembap_u, $lembap_t), 0.80],
             [min($hangat, $lembap_u, $normal_t), 0.65],
             [min($hangat, $lembap_u, $kering_t), 0.55],
@@ -310,7 +334,6 @@ class SensorController extends Controller
             [min($hangat, $kering_u, $lembap_t), 0.35],
             [min($hangat, $kering_u, $normal_t), 0.25],
             [min($hangat, $kering_u, $kering_t), 0.20],
-            // Suhu DINGIN (risiko rendah)
             [min($dingin, $lembap_u, $lembap_t), 0.45],
             [min($dingin, $lembap_u, $normal_t), 0.35],
             [min($dingin, $lembap_u, $kering_t), 0.25],
@@ -322,7 +345,6 @@ class SensorController extends Controller
             [min($dingin, $kering_u, $kering_t), 0.10],
         ];
 
-        // ── TAHAP 3: DEFUZZIFIKASI SUGENO (Weighted Average) ──────────────────────
         $num = $den = 0;
         foreach ($rules as [$r, $z]) {
             $num += $r * $z;
@@ -337,7 +359,6 @@ class SensorController extends Controller
         return $num / $den;
     }
 
-    // ── TAHAP 4: KEPUTUSAN ────────────────────────────────────────────────────────
     private function getStatus(float $nilai): array
     {
         $th = ThresholdSetting::getValue('threshold_hama',    0.70);
@@ -384,14 +405,14 @@ class SensorController extends Controller
     {
         $statusGlobal = $this->getStatusGlobal();
         view()->share('statusGlobal', $statusGlobal);
-
+ 
         $isOnline    = Cache::has('iot_live_data');
         $latest      = SensorReading::latest()->first();
         $data        = SensorReading::latest()->take(10)->get()->reverse()->values();
         $fuzzyValues = $data->map(fn($d) => $this->resolveFuzzyValue($d))->values()->toArray();
         $nilai       = count($fuzzyValues) ? end($fuzzyValues) : 0;
         [$status, $class] = $this->getStatus($nilai);
-
+ 
         $diff = 0;
         if (count($fuzzyValues) > 1) {
             $totalDiff = 0;
@@ -400,7 +421,7 @@ class SensorController extends Controller
             }
             $diff = $totalDiff / (count($fuzzyValues) - 1);
         }
-
+ 
         $prediksi = $prediksiStatus = [];
         for ($i = 1; $i <= 3; $i++) {
             $next = max(0, min(1, $nilai + $diff * $i));
@@ -408,18 +429,22 @@ class SensorController extends Controller
             [$ps] = $this->getStatus($next);
             $prediksiStatus[] = $ps;
         }
-
+ 
         $labelsHistoris = $data->pluck('created_at')
             ->map(fn($d) => $d->format('H:i'))->values()->toArray();
-
+ 
+        $thresholdHama    = ThresholdSetting::getValue('threshold_hama',    0.70);
+        $thresholdWaspada = ThresholdSetting::getValue('threshold_waspada', 0.45);
+ 
         return view('prediksi', compact(
             'latest', 'nilai', 'status', 'class',
             'prediksi', 'prediksiStatus',
-            'fuzzyValues', 'labelsHistoris', 'isOnline'
+            'fuzzyValues', 'labelsHistoris', 'isOnline',
+            'thresholdHama', 'thresholdWaspada'
         ));
     }
 
-    // ================== RIWAYAT ==================
+    // ================== RIWAYAT (USER) ==================
     public function riwayat()
     {
         $statusGlobal = $this->getStatusGlobal();
@@ -512,7 +537,6 @@ class SensorController extends Controller
 
         $s = $request->input('settings');
 
-        // Validasi urutan: aman < waspada < hama
         $params = [
             'Suhu Udara'       => ['suhu_aman',  'suhu_waspada',  'suhu_hama'],
             'Kelembapan Udara' => ['udara_aman', 'udara_waspada', 'udara_hama'],
@@ -593,5 +617,197 @@ class SensorController extends Controller
 
         return redirect()->route('admin.dashboard')
             ->with('success', '🗑️ Pengguna berhasil dihapus.');
+    }
+
+    public function debugFuzzy(Request $request)
+    {
+        $suhu  = (float) ($request->input('suhu',  28));
+        $udara = (float) ($request->input('udara', 70));
+        $tanah = (float) ($request->input('tanah', 60));
+ 
+        $sAman    = ThresholdSetting::getValue('suhu_aman',    22);
+        $sWaspada = ThresholdSetting::getValue('suhu_waspada', 28);
+        $sHama    = ThresholdSetting::getValue('suhu_hama',    32);
+        $uAman    = ThresholdSetting::getValue('udara_aman',    60);
+        $uWaspada = ThresholdSetting::getValue('udara_waspada', 75);
+        $uHama    = ThresholdSetting::getValue('udara_hama',    85);
+        $tAman    = ThresholdSetting::getValue('tanah_aman',    55);
+        $tWaspada = ThresholdSetting::getValue('tanah_waspada', 68);
+        $tHama    = ThresholdSetting::getValue('tanah_hama',    80);
+ 
+        $dingin   = max(0, min(1, ($sAman    - $suhu)  / self::T_SUHU));
+        $panas    = max(0, min(1, ($suhu  - $sWaspada) / max(0.01, $sHama - $sWaspada)));
+        $hangat   = max(0, min(1, 1 - $dingin - $panas));
+ 
+        $kering_u = max(0, min(1, ($uAman    - $udara) / self::T_LEMBAP));
+        $lembap_u = max(0, min(1, ($udara - $uWaspada) / max(0.01, $uHama - $uWaspada)));
+        $normal_u = max(0, min(1, 1 - $kering_u - $lembap_u));
+ 
+        $kering_t = max(0, min(1, ($tAman    - $tanah) / self::T_LEMBAP));
+        $lembap_t = max(0, min(1, ($tanah - $tWaspada) / max(0.01, $tHama - $tWaspada)));
+        $normal_t = max(0, min(1, 1 - $kering_t - $lembap_t));
+ 
+        $rulesDef = [
+            ['label'=>'panas+lembap_u+lembap_t', 'alpha'=>min($panas,$lembap_u,$lembap_t), 'z'=>1.00],
+            ['label'=>'panas+lembap_u+normal_t', 'alpha'=>min($panas,$lembap_u,$normal_t), 'z'=>0.85],
+            ['label'=>'panas+lembap_u+kering_t', 'alpha'=>min($panas,$lembap_u,$kering_t), 'z'=>0.75],
+            ['label'=>'panas+normal_u+lembap_t', 'alpha'=>min($panas,$normal_u,$lembap_t), 'z'=>0.70],
+            ['label'=>'panas+normal_u+normal_t', 'alpha'=>min($panas,$normal_u,$normal_t), 'z'=>0.55],
+            ['label'=>'panas+normal_u+kering_t', 'alpha'=>min($panas,$normal_u,$kering_t), 'z'=>0.45],
+            ['label'=>'panas+kering_u+lembap_t', 'alpha'=>min($panas,$kering_u,$lembap_t), 'z'=>0.50],
+            ['label'=>'panas+kering_u+normal_t', 'alpha'=>min($panas,$kering_u,$normal_t), 'z'=>0.40],
+            ['label'=>'panas+kering_u+kering_t', 'alpha'=>min($panas,$kering_u,$kering_t), 'z'=>0.30],
+            ['label'=>'hangat+lembap_u+lembap_t','alpha'=>min($hangat,$lembap_u,$lembap_t),'z'=>0.80],
+            ['label'=>'hangat+lembap_u+normal_t','alpha'=>min($hangat,$lembap_u,$normal_t),'z'=>0.65],
+            ['label'=>'hangat+lembap_u+kering_t','alpha'=>min($hangat,$lembap_u,$kering_t),'z'=>0.55],
+            ['label'=>'hangat+normal_u+lembap_t','alpha'=>min($hangat,$normal_u,$lembap_t),'z'=>0.50],
+            ['label'=>'hangat+normal_u+normal_t','alpha'=>min($hangat,$normal_u,$normal_t),'z'=>0.40],
+            ['label'=>'hangat+normal_u+kering_t','alpha'=>min($hangat,$normal_u,$kering_t),'z'=>0.30],
+            ['label'=>'hangat+kering_u+lembap_t','alpha'=>min($hangat,$kering_u,$lembap_t),'z'=>0.35],
+            ['label'=>'hangat+kering_u+normal_t','alpha'=>min($hangat,$kering_u,$normal_t),'z'=>0.25],
+            ['label'=>'hangat+kering_u+kering_t','alpha'=>min($hangat,$kering_u,$kering_t),'z'=>0.20],
+            ['label'=>'dingin+lembap_u+lembap_t','alpha'=>min($dingin,$lembap_u,$lembap_t),'z'=>0.45],
+            ['label'=>'dingin+lembap_u+normal_t','alpha'=>min($dingin,$lembap_u,$normal_t),'z'=>0.35],
+            ['label'=>'dingin+lembap_u+kering_t','alpha'=>min($dingin,$lembap_u,$kering_t),'z'=>0.25],
+            ['label'=>'dingin+normal_u+lembap_t','alpha'=>min($dingin,$normal_u,$lembap_t),'z'=>0.30],
+            ['label'=>'dingin+normal_u+normal_t','alpha'=>min($dingin,$normal_u,$normal_t),'z'=>0.20],
+            ['label'=>'dingin+normal_u+kering_t','alpha'=>min($dingin,$normal_u,$kering_t),'z'=>0.15],
+            ['label'=>'dingin+kering_u+lembap_t','alpha'=>min($dingin,$kering_u,$lembap_t),'z'=>0.20],
+            ['label'=>'dingin+kering_u+normal_t','alpha'=>min($dingin,$kering_u,$normal_t),'z'=>0.15],
+            ['label'=>'dingin+kering_u+kering_t','alpha'=>min($dingin,$kering_u,$kering_t),'z'=>0.10],
+        ];
+ 
+        $num = $den = 0;
+        $activeRules = [];
+        foreach ($rulesDef as $rule) {
+            $num += $rule['alpha'] * $rule['z'];
+            $den += $rule['alpha'];
+            if ($rule['alpha'] > 0) {
+                $activeRules[] = [
+                    'rule'  => $rule['label'],
+                    'alpha' => round($rule['alpha'], 4),
+                    'z'     => $rule['z'],
+                    'kontribusi' => round($rule['alpha'] * $rule['z'], 4),
+                ];
+            }
+        }
+ 
+        $nilaiFuzzy = $den > 0 ? $num / $den : 0;
+        [$status] = $this->getStatus($nilaiFuzzy);
+ 
+        return response()->json([
+            'input' => [
+                'suhu'  => $suhu,
+                'udara' => $udara,
+                'tanah' => $tanah,
+            ],
+            'thresholds' => [
+                'suhu_aman'       => $sAman,    'suhu_waspada'  => $sWaspada, 'suhu_hama'  => $sHama,
+                'udara_aman'      => $uAman,    'udara_waspada' => $uWaspada, 'udara_hama' => $uHama,
+                'tanah_aman'      => $tAman,    'tanah_waspada' => $tWaspada, 'tanah_hama' => $tHama,
+                'threshold_hama'    => ThresholdSetting::getValue('threshold_hama',    0.70),
+                'threshold_waspada' => ThresholdSetting::getValue('threshold_waspada', 0.45),
+            ],
+            'membership' => [
+                'suhu'  => ['dingin'=>round($dingin,4), 'hangat'=>round($hangat,4), 'panas'=>round($panas,4)],
+                'udara' => ['kering'=>round($kering_u,4), 'normal'=>round($normal_u,4), 'lembap'=>round($lembap_u,4)],
+                'tanah' => ['kering'=>round($kering_t,4), 'normal'=>round($normal_t,4), 'lembap'=>round($lembap_t,4)],
+            ],
+            'rules' => [
+                'total'       => count($rulesDef),
+                'aktif'       => count($activeRules),
+                'detail_aktif'=> $activeRules,
+                'numerator'   => round($num, 6),
+                'denominator' => round($den, 6),
+            ],
+            'output' => [
+                'nilai_fuzzy' => round($nilaiFuzzy, 4),
+                'status'      => $status,
+            ],
+        ], 200, [], JSON_PRETTY_PRINT);
+    }
+
+    // ================== ADMIN: RIWAYAT DATA ==================
+    public function adminRiwayat()
+    {
+        $statusGlobal = $this->getStatusGlobal();
+        view()->share('statusGlobal', $statusGlobal);
+
+        $query = SensorReading::latest();
+
+        $filter = request('filter');
+        if ($filter === '7hari')      $query->where('created_at', '>=', now()->subDays(7));
+        elseif ($filter === '1bulan') $query->where('created_at', '>=', now()->subMonth());
+        elseif ($filter === '3bulan') $query->where('created_at', '>=', now()->subMonths(3));
+
+        $filterDeteksi = request('deteksi');
+        if (in_array($filterDeteksi, ['HAMA', 'WASPADA', 'AMAN'])) {
+            $query->where('deteksi', $filterDeteksi);
+        }
+
+        $data = $query->paginate(15);
+
+        $data->getCollection()->transform(function ($item) {
+            $nilai = $this->resolveFuzzyValue($item);
+            [$status] = $this->getStatus($nilai);
+            $item->nilai = round($nilai, 3);
+            $item->status = $status;
+            return $item;
+        });
+
+        return view('admin.riwayat', compact('data'));
+    }
+
+    // ================== ADMIN: HAPUS DATA RIWAYAT ==================
+    public function adminDestroyRiwayat($id)
+    {
+        $id = (int) $id;
+        Log::info('=== HAPUS DATA ID: ' . $id . ' ===');
+
+        try {
+            $data = SensorReading::findOrFail($id);
+
+            if ($data->image && Storage::disk('public')->exists($data->image)) {
+                Storage::disk('public')->delete($data->image);
+            }
+
+            $data->delete();
+
+            return redirect()->route('admin.riwayat')
+                ->with('success', '🗑️ Data riwayat berhasil dihapus.');
+        } catch (\Exception $e) {
+            Log::error('Gagal hapus data ID ' . $id . ': ' . $e->getMessage());
+            return redirect()->route('admin.riwayat')
+                ->with('error', '❌ Gagal menghapus data: ' . $e->getMessage());
+        }
+    }
+
+    // ================== ADMIN: HAPUS SEMUA DATA RIWAYAT ==================
+    public function adminDestroyAllRiwayat()
+    {
+        Log::info('=== HAPUS SEMUA DATA ===');
+
+        try {
+            $items = SensorReading::whereNotNull('image')->get();
+
+            foreach ($items as $item) {
+                if ($item->image && Storage::disk('public')->exists($item->image)) {
+                    Storage::disk('public')->delete($item->image);
+                }
+            }
+
+            SensorReading::query()->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Semua data berhasil dihapus.'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Gagal hapus semua data: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 }
