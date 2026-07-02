@@ -8,12 +8,13 @@
         { "src": "/build/(.*)", "dest": "/public/build/" },
         { "src": "/(.*)", "dest": "/api/index.php" }
     ],
-    "buildCommand": "composer install --no-dev --optimize-autoloader && npm install && npm run build",
+    "buildCommand": "php -r \"copy('https://getcomposer.org/installer', 'composer-setup.php');\" && php composer-setup.php && php composer.phar install --no-dev --optimize-autoloader && npm install && npm run build",
+    "installCommand": "npm install",
     "outputDirectory": "public",
     "env": {
         "APP_ENV": "production",
         "APP_DEBUG": "false",
-        "APP_URL": "https://smartfarm-xxx.vercel.app",
+        "APP_URL": "https://web-monitoring-ta.vercel.app",
         "APP_KEY": "base64:eE4axuy6MbDoW25Z3QEzmiv5bPAv0djDJKFFZh8XZ4w=",
         "APP_CONFIG_CACHE": "/tmp/config.php",
         "APP_EVENTS_CACHE": "/tmp/events.php",
