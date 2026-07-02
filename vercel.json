@@ -8,7 +8,7 @@
         { "src": "/build/(.*)", "dest": "/public/build/" },
         { "src": "/(.*)", "dest": "/api/index.php" }
     ],
-    "buildCommand": "php -r \"copy('https://getcomposer.org/installer', 'composer-setup.php');\" && php composer-setup.php && php composer.phar install --no-dev --optimize-autoloader && npm install && npm run build",
+    "buildCommand": "npm install && npm run build",
     "installCommand": "npm install",
     "outputDirectory": "public",
     "env": {
