@@ -38,16 +38,7 @@
         {{-- Tombol Reset --}}
         <div style="align-self:flex-end;">
             <a href="{{ route('riwayat') }}"
-               style="
-                display:inline-block;
-                padding:8px 14px;
-                border-radius:8px;
-                background:#f1f5f9;
-                color:#475569;
-                text-decoration:none;
-                font-size:13px;
-                border:1px solid #ddd;
-               ">
+               style="display:inline-block; padding:8px 14px; border-radius:8px; background:#f1f5f9; color:#475569; text-decoration:none; font-size:13px; border:1px solid #ddd;">
                 🔄 Reset
             </a>
         </div>
@@ -56,17 +47,7 @@
 
     {{-- RINGKASAN --}}
     @if($data->total() > 0)
-    <div style="
-        background:#f8fafc;
-        border-radius:10px;
-        padding:12px 16px;
-        margin-bottom:16px;
-        display:flex;
-        gap:24px;
-        flex-wrap:wrap;
-        font-size:13px;
-        color:#475569;
-    ">
+    <div style="background:#f8fafc; border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; gap:24px; flex-wrap:wrap; font-size:13px; color:#475569;">
         <span>📊 Total data: <b>{{ $data->total() }}</b></span>
         <span>🔴 HAMA: <b>{{ $data->getCollection()->where('deteksi','HAMA')->count() }}</b></span>
         <span>🟡 WASPADA: <b>{{ $data->getCollection()->where('deteksi','WASPADA')->count() }}</b></span>
@@ -88,6 +69,8 @@
                     <th>Tanah</th>
                     <th>Nilai Fuzzy</th>
                     <th>Status</th>
+                    <th>Hasil YOLO</th>
+                    <th>Confidence</th>
                     <th>Gambar</th>
                 </tr>
             </thead>
@@ -106,9 +89,7 @@
                     </td>
 
                     <td><span class="cell suhu">{{ $item->suhu }}°C</span></td>
-
                     <td><span class="cell udara">{{ $item->kelembapan_udara }}%</span></td>
-
                     <td><span class="cell tanah">{{ $item->kelembapan_tanah }}%</span></td>
 
                     <td style="text-align:center; font-weight:600; color:#475569;">
@@ -116,12 +97,28 @@
                     </td>
 
                     <td>
-                        {{-- ✅ PERBAIKAN: Gunakan 'HAMA' dan 'WASPADA' sesuai logika Fuzzy --}}
-                        <span class="
-                            {{ $item->status == 'HAMA' ? 'status-high' :
-                               ($item->status == 'WASPADA' ? 'status-medium' : 'status-low') }}">
+                        <span class="{{ $item->status == 'HAMA' ? 'status-high' : ($item->status == 'WASPADA' ? 'status-medium' : 'status-low') }}">
                             {{ $item->status }}
                         </span>
+                    </td>
+
+                    <td>
+                        @if($item->deteksi_yolo)
+                            <span class="
+                                {{ $item->deteksi_yolo == 'Tikus Terdeteksi' ? 'status-high' : 'status-low' }}">
+                                {{ $item->deteksi_yolo }}
+                            </span>
+                        @else
+                            <span style="color:#cbd5e1; font-size:12px;">Tidak ada</span>
+                        @endif
+                    </td>
+
+                    <td>
+                        @if($item->confidence_yolo)
+                            {{ number_format($item->confidence_yolo * 100, 2) }}%
+                        @else
+                            <span style="color:#cbd5e1; font-size:12px;">-</span>
+                        @endif
                     </td>
 
                     <td>
@@ -140,7 +137,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" style="text-align:center; padding:30px; color:#94a3b8;">
+                    <td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">
                         📭 Belum ada data yang ditemukan
                     </td>
                 </tr>
@@ -153,19 +150,11 @@
 
     {{-- PAGINATION --}}
     @if($data->total() > 0)
-    <div style="
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        margin-top:16px;
-        flex-wrap:wrap;
-        gap:10px;
-    ">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; flex-wrap:wrap; gap:10px;">
         <div style="font-size:13px; color:#64748b;">
             Menampilkan {{ $data->firstItem() ?? 0 }}–{{ $data->lastItem() ?? 0 }}
             dari <b>{{ $data->total() }}</b> data
         </div>
-
         <div class="pagination">
             {{ $data->appends(request()->query())->links() }}
         </div>

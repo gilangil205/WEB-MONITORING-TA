@@ -211,7 +211,8 @@
                 'tanah_aman'        => ['value'=>55,   'min_input'=>0,  'max_input'=>100],
                 'tanah_waspada'     => ['value'=>68,   'min_input'=>0,  'max_input'=>100],
                 'tanah_hama'        => ['value'=>80,   'min_input'=>0,  'max_input'=>100],
-                'threshold_hama'    => ['value'=>0.70, 'min_input'=>0.51,'max_input'=>0.99],
+                // ✅ UBAH min_input threshold_hama dari 0.51 menjadi 0.01
+                'threshold_hama'    => ['value'=>0.70, 'min_input'=>0.01,'max_input'=>0.99],
                 'threshold_waspada' => ['value'=>0.45, 'min_input'=>0.01,'max_input'=>0.69],
             ];
             $get = function($key) use ($settings, $def) {
@@ -392,8 +393,8 @@
                             id="threshold_hama"
                             name="settings[threshold_hama]"
                             value="{{ old('settings.threshold_hama', $get('threshold_hama')->value) }}"
-                            min="{{ $get('threshold_hama')->min_input ?? 0.51 }}"
-                            max="{{ $get('threshold_hama')->max_input ?? 0.99 }}"
+                            min="0.01"
+                            max="0.99"
                             oninput="updateFuzzyPreview()">
                         <div class="zone-hint" style="color:#3730a3;">Default: 0.70</div>
                     </div>
@@ -403,8 +404,8 @@
                             id="threshold_waspada"
                             name="settings[threshold_waspada]"
                             value="{{ old('settings.threshold_waspada', $get('threshold_waspada')->value) }}"
-                            min="{{ $get('threshold_waspada')->min_input ?? 0.01 }}"
-                            max="{{ $get('threshold_waspada')->max_input ?? 0.69 }}"
+                            min="0.01"
+                            max="0.69"
                             oninput="updateFuzzyPreview()">
                         <div class="zone-hint" style="color:#3730a3;">Default: 0.45</div>
                     </div>

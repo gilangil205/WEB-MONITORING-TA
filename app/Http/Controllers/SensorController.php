@@ -42,10 +42,67 @@ class SensorController extends Controller
         return $statusGlobal;
     }
 
+    // ================== HELPER: STATUS AIR (KEKERINGAN) ==================
+    private function getWaterStatus(float $tanah, float $udara, float $suhu): array
+    {
+        // Aturan sederhana berdasarkan kelembapan tanah (utama) + suhu & udara (pendukung)
+        if ($tanah < 30) {
+            // Kering parah
+            $status = '🚨 KERING PARAH';
+            $class = 'status-critical';
+            $rekomendasi = 'Segera lakukan penyiraman dengan volume banyak! Tanah sangat kering.';
+        } elseif ($tanah < 45) {
+            // Kering
+            $status = '⚠️ KERING';
+            $class = 'status-warning';
+            $rekomendasi = 'Lakukan penyiraman sekarang. Tanah mulai mengering.';
+        } elseif ($tanah >= 45 && $tanah <= 70) {
+            // Cukup
+            $status = '✅ CUKUP';
+            $class = 'status-good';
+            $rekomendasi = 'Kelembapan tanah ideal. Pertahankan kondisi ini.';
+        } elseif ($tanah > 70 && $tanah <= 85) {
+            // Lembap
+            $status = '🌧️ LEMBAP';
+            $class = 'status-warning';
+            $rekomendasi = 'Tanah cukup lembap. Kurangi penyiraman jika hujan.';
+        } elseif ($tanah > 85) {
+            // Terlalu basah
+            $status = '🌊 TERLALU BASAH';
+            $class = 'status-critical';
+            $rekomendasi = 'Hentikan penyiraman! Perbaiki drainase untuk mencegah akar busuk.';
+        } else {
+            $status = '✅ CUKUP';
+            $class = 'status-good';
+            $rekomendasi = 'Kelembapan tanah normal.';
+        }
+
+        // Faktor koreksi suhu dan udara (memperkuat atau memperlemah)
+        if ($suhu > 30 && $udara < 50 && $tanah < 50) {
+            $status = '🔥 KERING + PANAS';
+            $class = 'status-critical';
+            $rekomendasi = 'Kondisi panas dan udara kering mempercepat penguapan. Segera siram!';
+        } elseif ($suhu > 30 && $tanah < 60) {
+            $status = '☀️ KERING & PANAS';
+            $class = 'status-warning';
+            $rekomendasi = 'Suhu tinggi. Periksa kelembapan tanah dan siram jika perlu.';
+        } elseif ($suhu < 20 && $tanah > 75) {
+            $status = '🥶 DINGIN & BASAH';
+            $class = 'status-warning';
+            $rekomendasi = 'Suhu rendah dan tanah basah. Kurangi penyiraman.';
+        }
+
+        return [
+            'status' => $status,
+            'class' => $class,
+            'rekomendasi' => $rekomendasi,
+            'nilai_tanah' => $tanah,
+        ];
+    }
+
     // ================== HELPER: BUAT NOTIFIKASI ==================
     private function createNotification(string $status, float $nilai, ?SensorReading $sensor = null)
     {
-        // Dapatkan semua user (atau bisa difilter hanya user aktif)
         $users = User::whereIn('role', ['user', 'admin'])->get();
 
         if ($status === 'HAMA') {
@@ -55,7 +112,7 @@ class SensorController extends Controller
             $title = '⚠️ Status Waspada Hama';
             $message = "Kondisi lingkungan mulai mengarah ke risiko hama (nilai fuzzy {$nilai}). Tingkatkan frekuensi monitoring.";
         } else {
-            return; // Hanya buat notifikasi untuk HAMA dan WASPADA
+            return;
         }
 
         foreach ($users as $user) {
@@ -195,6 +252,8 @@ class SensorController extends Controller
             'kelembapan_udara' => 'required|numeric|between:0,100',
             'kelembapan_tanah' => 'required|numeric|between:0,100',
             'image'            => 'nullable|image|max:5120',
+            'deteksi_yolo'     => 'nullable|string|max:255',
+            'confidence_yolo'  => 'nullable|numeric|between:0,1',
         ]);
 
         $path = null;
@@ -226,9 +285,10 @@ class SensorController extends Controller
             'nilai_fuzzy'      => $nilai,
             'image'            => $path,
             'deteksi'          => $status,
+            'deteksi_yolo'     => $request->deteksi_yolo,
+            'confidence_yolo'  => $request->confidence_yolo,
         ]);
 
-        // ✅ Buat notifikasi jika status HAMA atau WASPADA
         if (in_array($status, ['HAMA', 'WASPADA'])) {
             $this->createNotification($status, $nilai, $sensor);
         }
@@ -237,6 +297,8 @@ class SensorController extends Controller
             'message'            => 'Data diproses',
             'status'             => $status,
             'nilai'              => round($nilai, 4),
+            'deteksi_yolo'       => $request->deteksi_yolo,
+            'confidence_yolo'    => $request->confidence_yolo,
             'stored_in_cache'    => true,
             'stored_in_database' => true,
         ], 201);
@@ -245,27 +307,23 @@ class SensorController extends Controller
     // ================== MANUAL (AMBIL DATA REAL-TIME) ==================
     public function manual()
     {
-        // ✅ AMBIL DATA REAL-TIME DARI CACHE
         if (Cache::has('iot_live_data')) {
             $cache = Cache::get('iot_live_data');
             $suhu  = $cache['suhu'] ?? 0;
             $udara = $cache['kelembapan_udara'] ?? 0;
             $tanah = $cache['kelembapan_tanah'] ?? 0;
         } else {
-            // Jika cache kosong, ambil data terakhir dari database
             $latest = SensorReading::latest()->first();
             if ($latest) {
                 $suhu  = $latest->suhu;
                 $udara = $latest->kelembapan_udara;
                 $tanah = $latest->kelembapan_tanah;
             } else {
-                // Jika tidak ada data sama sekali, beri pesan error
                 return redirect()->route('dashboard')
                     ->with('error', '❌ Belum ada data sensor. Tunggu kiriman data dari IoT atau gunakan mode simulasi.');
             }
         }
 
-        // Hitung ulang fuzzy dengan data real-time
         $nilai = $this->fuzzySugeno($suhu, $udara, $tanah);
         [$status] = $this->getStatus($nilai);
 
@@ -277,7 +335,6 @@ class SensorController extends Controller
             'deteksi'          => $status,
         ]);
 
-        // ✅ Buat notifikasi jika status HAMA atau WASPADA
         if (in_array($status, ['HAMA', 'WASPADA'])) {
             $this->createNotification($status, $nilai, $sensor);
         }
@@ -381,10 +438,38 @@ class SensorController extends Controller
         $nilai    = $latest ? $this->resolveFuzzyValue($latest) : 0;
         [$status, $class] = $this->getStatus($nilai);
 
+        // Data untuk status air (dari cache jika online, atau dari database terakhir)
+        $waterStatus = '✅ CUKUP';
+        $waterClass = 'status-good';
+        $waterRecommendation = 'Kelembapan tanah normal.';
+        $waterTanah = 0;
+
         if ($isOnline) {
             $cache = Cache::get('iot_live_data');
             $nilai = $cache['nilai_fuzzy'] ?? $nilai;
             [$status, $class] = $this->getStatus($nilai);
+            
+            // Ambil data untuk status air
+            $suhu  = $cache['suhu'] ?? 0;
+            $udara = $cache['kelembapan_udara'] ?? 0;
+            $tanah = $cache['kelembapan_tanah'] ?? 0;
+            
+            $water = $this->getWaterStatus($tanah, $udara, $suhu);
+            $waterStatus = $water['status'];
+            $waterClass = $water['class'];
+            $waterRecommendation = $water['rekomendasi'];
+            $waterTanah = $water['nilai_tanah'];
+        } elseif ($latest) {
+            // Jika offline, ambil dari database terakhir
+            $tanah = $latest->kelembapan_tanah ?? 0;
+            $udara = $latest->kelembapan_udara ?? 0;
+            $suhu  = $latest->suhu ?? 0;
+            
+            $water = $this->getWaterStatus($tanah, $udara, $suhu);
+            $waterStatus = $water['status'];
+            $waterClass = $water['class'];
+            $waterRecommendation = $water['rekomendasi'];
+            $waterTanah = $water['nilai_tanah'];
         }
 
         $labels     = $data->pluck('created_at')->map(fn($d) => $d->format('H:i'))->values();
@@ -396,7 +481,8 @@ class SensorController extends Controller
 
         return view('dashboard', compact(
             'latest', 'data', 'nilai', 'status', 'class',
-            'labels', 'suhu', 'suhu_udara', 'udara', 'tanah', 'fuzzyChart', 'isOnline'
+            'labels', 'suhu', 'suhu_udara', 'udara', 'tanah', 'fuzzyChart', 'isOnline',
+            'waterStatus', 'waterClass', 'waterRecommendation', 'waterTanah'  // ← tambahan untuk status air
         ));
     }
 
@@ -803,7 +889,7 @@ class SensorController extends Controller
                 'message' => 'Semua data berhasil dihapus.'
             ]);
         } catch (\Exception $e) {
-            Log::error('Gagal hapus semua data: ' . $e->getMessage());
+            Log::error('Gagal hapus semua数据: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()

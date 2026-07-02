@@ -97,7 +97,6 @@
             🔄 Reset
         </a>
 
-        {{-- 🗑️ TOMBOL HAPUS SEMUA --}}
         <button type="button" id="btn-delete-all" class="btn-delete-all">
             🗑️ Hapus Semua
         </button>
@@ -107,17 +106,7 @@
 
 {{-- RINGKASAN --}}
 @if($data->total() > 0)
-<div style="
-    background:#f8fafc;
-    border-radius:10px;
-    padding:12px 16px;
-    margin-bottom:16px;
-    display:flex;
-    gap:24px;
-    flex-wrap:wrap;
-    font-size:13px;
-    color:#475569;
-">
+<div style="background:#f8fafc; border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; gap:24px; flex-wrap:wrap; font-size:13px; color:#475569;">
     <span>📊 Total data: <b>{{ $data->total() }}</b></span>
     <span>🔴 HAMA: <b>{{ $data->getCollection()->where('status','HAMA')->count() }}</b></span>
     <span>🟡 WASPADA: <b>{{ $data->getCollection()->where('status','WASPADA')->count() }}</b></span>
@@ -139,6 +128,8 @@
                 <th>Tanah</th>
                 <th>Nilai Fuzzy</th>
                 <th>Status</th>
+                <th>Hasil YOLO</th>
+                <th>Confidence</th>
                 <th>Gambar</th>
                 <th style="text-align:center;">Aksi</th>
             </tr>
@@ -166,11 +157,27 @@
                 </td>
 
                 <td>
-                    <span class="
-                        {{ $item->status == 'HAMA' ? 'status-high' :
-                           ($item->status == 'WASPADA' ? 'status-medium' : 'status-low') }}">
+                    <span class="{{ $item->status == 'HAMA' ? 'status-high' : ($item->status == 'WASPADA' ? 'status-medium' : 'status-low') }}">
                         {{ $item->status }}
                     </span>
+                </td>
+
+                <td>
+                    @if($item->deteksi_yolo)
+                        <span class="{{ $item->deteksi_yolo == 'Tikus Terdeteksi' ? 'status-high' : 'status-low' }}">
+                            {{ $item->deteksi_yolo }}
+                        </span>
+                    @else
+                        <span style="color:#cbd5e1; font-size:12px;">Tidak ada</span>
+                    @endif
+                </td>
+
+                <td>
+                    @if($item->confidence_yolo)
+                        {{ number_format($item->confidence_yolo * 100, 2) }}%
+                    @else
+                        <span style="color:#cbd5e1; font-size:12px;">-</span>
+                    @endif
                 </td>
 
                 <td>
@@ -186,7 +193,6 @@
                     @endif
                 </td>
 
-                {{-- 🗑️ TOMBOL HAPUS SATU --}}
                 <td style="text-align:center;">
                     <form action="{{ route('admin.riwayat.delete', $item->id) }}" method="POST"
                           onsubmit="return confirm('Yakin ingin menghapus data ini?');"
@@ -202,7 +208,7 @@
             </tr>
             @empty
             <tr>
-                <td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">
+                <td colspan="11" style="text-align:center; padding:30px; color:#94a3b8;">
                     📭 Belum ada data yang ditemukan
                 </td>
             </tr>
@@ -215,19 +221,11 @@
 
 {{-- PAGINATION --}}
 @if($data->total() > 0)
-<div style="
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-top:16px;
-    flex-wrap:wrap;
-    gap:10px;
-">
+<div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; flex-wrap:wrap; gap:10px;">
     <div style="font-size:13px; color:#64748b;">
         Menampilkan {{ $data->firstItem() ?? 0 }}–{{ $data->lastItem() ?? 0 }}
         dari <b>{{ $data->total() }}</b> data
     </div>
-
     <div class="pagination">
         {{ $data->appends(request()->query())->links() }}
     </div>
@@ -240,9 +238,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnDeleteAll = document.getElementById('btn-delete-all');
 
     if (btnDeleteAll) {
-        // Ambil URL dari route yang sudah di-generate oleh Blade
         const deleteAllUrl = @json(route('admin.riwayat.delete-all'));
-        console.log('🔗 Delete All URL:', deleteAllUrl); // Cek di console browser
+        console.log('🔗 Delete All URL:', deleteAllUrl);
 
         btnDeleteAll.addEventListener('click', function(e) {
             e.preventDefault();
