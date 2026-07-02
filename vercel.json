@@ -5,7 +5,7 @@
         "api/index.php": { "runtime": "vercel-php@0.7.1" }
     },
     "routes": [
-        { "src": "/build/(.*)", "dest": "/public/build/" },
+        { "src": "/build/(.*)", "dest": "/public/build/$1" },
         { "src": "/(.*)", "dest": "/api/index.php" }
     ],
     "buildCommand": "npm install && npm run build",
@@ -14,7 +14,7 @@
     "env": {
         "APP_ENV": "production",
         "APP_DEBUG": "false",
-        "APP_URL": "https://web-monitoring-ta.vercel.app",
+        "APP_URL": "https://web-monitoring-ta-two.vercel.app",
         "APP_KEY": "base64:eE4axuy6MbDoW25Z3QEzmiv5bPAv0djDJKFFZh8XZ4w=",
         "APP_CONFIG_CACHE": "/tmp/config.php",
         "APP_EVENTS_CACHE": "/tmp/events.php",
