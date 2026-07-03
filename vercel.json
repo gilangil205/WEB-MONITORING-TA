@@ -6,20 +6,12 @@
     "routes": [
         { "src": "/(.*)", "dest": "/api/index.php" }
     ],
-    "buildCommand": "npm install && npm run build",
-    "installCommand": "npm install",
     "outputDirectory": "public",
     "env": {
         "APP_ENV": "production",
         "APP_DEBUG": "false",
         "APP_URL": "https://web-monitoring-ta-two.vercel.app",
         "APP_KEY": "base64:eE4axuy6MbDoW25Z3QEzmiv5bPAv0djDJKFFZh8XZ4w=",
-        "APP_CONFIG_CACHE": "/tmp/config.php",
-        "APP_EVENTS_CACHE": "/tmp/events.php",
-        "APP_PACKAGES_CACHE": "/tmp/packages.php",
-        "APP_ROUTES_CACHE": "/tmp/routes.php",
-        "APP_SERVICES_CACHE": "/tmp/services.php",
-        "VIEW_COMPILED_PATH": "/tmp",
         "CACHE_DRIVER": "array",
         "LOG_CHANNEL": "stderr",
         "SESSION_DRIVER": "cookie",
