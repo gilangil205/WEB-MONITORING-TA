@@ -24,11 +24,11 @@
         "LOG_CHANNEL": "stderr",
         "SESSION_DRIVER": "cookie",
         "DB_CONNECTION": "pgsql",
-        "DB_HOST": "ep-red-rice-aoms8gtz.c-2.ap-southeast-1.aws.neon.tech",
+        "DB_HOST": "ep-old-base-aot46kry-pooler.c-2.ap-southeast-1.aws.neon.tech",
         "DB_PORT": "5432",
         "DB_DATABASE": "neondb",
         "DB_USERNAME": "neondb_owner",
-        "DB_PASSWORD": "npg_fEqmA9vOK4ic",
+        "DB_PASSWORD": "npg_FT2n7txwZWvO",
         "IOT_API_TOKEN": "smartfarm-secret-token"
     }
 }
