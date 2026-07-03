@@ -6,7 +6,6 @@
     "routes": [
         { "src": "/(.*)", "dest": "/api/index.php" }
     ],
-    "buildCommand": "composer install --no-interaction && npm install && npm run build",
     "outputDirectory": "public",
     "env": {
         "APP_ENV": "production",
