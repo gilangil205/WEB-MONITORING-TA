@@ -41,8 +41,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('/riwayat/{id}', [SensorController::class, 'adminDestroyRiwayat'])->name('riwayat.delete');
 });
 
-Route::post('/api/sensor', [SensorController::class, 'store']);
-Route::get('/api/kamera/latest', [SensorController::class, 'kameraLatest'])->name('kamera.api');
 
 if (app()->environment('local', 'staging')) {
     Route::get('/debug/fuzzy', [SensorController::class, 'debugFuzzy'])->name('debug.fuzzy');
