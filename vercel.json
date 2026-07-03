@@ -6,6 +6,7 @@
     "routes": [
         { "src": "/(.*)", "dest": "/api/index.php" }
     ],
+    "buildCommand": "composer install --no-interaction && npm install && npm run build",
     "outputDirectory": "public",
     "env": {
         "APP_ENV": "production",
@@ -20,7 +21,6 @@
         "DB_PORT": "5432",
         "DB_DATABASE": "neondb",
         "DB_USERNAME": "neondb_owner",
-        "DB_PASSWORD": "npg_FT2n7txwZWvO",
-        "IOT_API_TOKEN": "smartfarm-secret-token"
+        "DB_PASSWORD": "npg_FT2n7txwZWvO"
     }
 }
