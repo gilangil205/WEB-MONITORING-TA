@@ -6,20 +6,5 @@
     "routes": [
         { "src": "/(.*)", "dest": "/api/index.php" }
     ],
-    "outputDirectory": "public",
-    "env": {
-        "APP_ENV": "production",
-        "APP_DEBUG": "false",
-        "APP_URL": "https://web-monitoring-ta-two.vercel.app",
-        "APP_KEY": "base64:eE4axuy6MbDoW25Z3QEzmiv5bPAv0djDJKFFZh8XZ4w=",
-        "CACHE_DRIVER": "array",
-        "LOG_CHANNEL": "stderr",
-        "SESSION_DRIVER": "cookie",
-        "DB_CONNECTION": "pgsql",
-        "DB_HOST": "ep-old-base-aot46kry-pooler.c-2.ap-southeast-1.aws.neon.tech",
-        "DB_PORT": "5432",
-        "DB_DATABASE": "neondb",
-        "DB_USERNAME": "neondb_owner",
-        "DB_PASSWORD": "npg_FT2n7txwZWvO"
-    }
+    "outputDirectory": "public"
 }
