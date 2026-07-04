@@ -5,7 +5,10 @@ use App\Http\Controllers\SensorController;
 use App\Http\Controllers\NotificationController;
 
 Route::get('/', function () {
-    return redirect()->route('dashboard');
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'Laravel berjalan'
+    ]);
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
