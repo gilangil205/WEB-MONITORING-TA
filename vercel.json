@@ -1,10 +1,18 @@
 {
-    "version": 2,
-    "functions": {
-        "api/index.php": { "runtime": "vercel-php@0.7.1" }
+  "version": 2,
+  "functions": {
+    "api/index.php": {
+      "runtime": "vercel-php@0.7.1"
+    }
+  },
+  "routes": [
+    {
+      "src": "/build/(.*)",
+      "dest": "/public/build/$1"
     },
-    "routes": [
-        { "src": "/(.*)", "dest": "/api/index.php" }
-    ],
-    "outputDirectory": "public"
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.php"
+    }
+  ]
 }

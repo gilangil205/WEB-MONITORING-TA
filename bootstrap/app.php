@@ -12,15 +12,19 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware): void {
+    ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'admin' => AdminMiddleware::class,
         ]);
 
-        // ✅ TAMBAHKAN INI: exclude CSRF untuk route API
         $middleware->validateCsrfTokens(except: [
             '/api/sensor',
             '/api/*',
+        ]);
+
+        // TAMBAHKAN INI
+        $middleware->use([
+            \App\Http\Middleware\TrustProxies::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

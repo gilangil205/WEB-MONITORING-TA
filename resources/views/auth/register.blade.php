@@ -241,7 +241,7 @@
                         id="password"
                         type="password"
                         name="password"
-                        placeholder="Minimal jangan password123 lah"
+                        placeholder="Masukkan password"
                         required
                         autocomplete="new-password"
                     >
@@ -257,7 +257,7 @@
                         id="password_confirmation"
                         type="password"
                         name="password_confirmation"
-                        placeholder="Ulangin lagi biar server percaya"
+                        placeholder="Masukkan ulang password"
                         required
                         autocomplete="new-password"
                     >
@@ -274,11 +274,6 @@
                     <a href="{{ route('login') }}">
                         Masuk di sini
                     </a>
-                </div>
-
-                <div class="iot-status">
-                    <div class="iot-dot"></div>
-                    <span>Sistem Monitoring SmartFarm Aktif • IoT Connected</span>
                 </div>
             </form>
 

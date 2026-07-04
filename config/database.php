@@ -98,6 +98,8 @@ return [
         \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
         \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
         'sslmode' => 'require',  // ← WAJIB untuk Neon
+        'sslmode' => env('DB_SSLMODE', 'require'),
+        'url' => env('DB_URL'),
     ],
 ],
 
