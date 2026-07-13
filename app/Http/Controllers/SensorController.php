@@ -19,6 +19,33 @@ class SensorController extends Controller
     private const T_SUHU   = 3;
     private const T_LEMBAP = 5;
 
+    // ================== HELPER: HYBRID LOGIC (70% YOLO + 30% FUZZY) ==================
+    private function getHybridStatus(?string $deteksiYolo, ?float $confidenceYolo, float $nilaiFuzzy): array
+    {
+        // Jika tidak ada data YOLO, fallback ke Fuzzy murni
+        if (empty($deteksiYolo) || $confidenceYolo === null || $confidenceYolo < 0.3) {
+            return $this->getStatus($nilaiFuzzy);
+        }
+
+        // Deteksi keyword hama
+        $isDetected = stripos($deteksiYolo, 'terdeteksi') !== false ||
+                      stripos($deteksiYolo, 'detected') !== false ||
+                      stripos($deteksiYolo, 'hama') !== false ||
+                      stripos($deteksiYolo, 'tikus') !== false;
+
+        if ($isDetected) {
+            $yoloScore = max($confidenceYolo, 0.7);
+        } else {
+            $yoloScore = 0;
+        }
+
+        // 🔥 70% YOLO + 30% Fuzzy
+        $nilaiHybrid = ($yoloScore * 0.7) + ($nilaiFuzzy * 0.3);
+        $nilaiHybrid = max(0, min(1, $nilaiHybrid));
+
+        return $this->getStatus($nilaiHybrid);
+    }
+
     // ================== HELPER: RESOLVE NILAI FUZZY ==================
     private function resolveFuzzyValue(mixed $item)
     {
@@ -42,32 +69,26 @@ class SensorController extends Controller
         return $statusGlobal;
     }
 
-    // ================== HELPER: STATUS AIR (KEKERINGAN) ==================
+    // ================== HELPER: STATUS AIR ==================
     private function getWaterStatus(float $tanah, float $udara, float $suhu): array
     {
-        // Aturan sederhana berdasarkan kelembapan tanah (utama) + suhu & udara (pendukung)
         if ($tanah < 30) {
-            // Kering parah
             $status = '🚨 KERING PARAH';
             $class = 'status-critical';
             $rekomendasi = 'Segera lakukan penyiraman dengan volume banyak! Tanah sangat kering.';
         } elseif ($tanah < 45) {
-            // Kering
             $status = '⚠️ KERING';
             $class = 'status-warning';
             $rekomendasi = 'Lakukan penyiraman sekarang. Tanah mulai mengering.';
         } elseif ($tanah >= 45 && $tanah <= 70) {
-            // Cukup
             $status = '✅ CUKUP';
             $class = 'status-good';
             $rekomendasi = 'Kelembapan tanah ideal. Pertahankan kondisi ini.';
         } elseif ($tanah > 70 && $tanah <= 85) {
-            // Lembap
             $status = '🌧️ LEMBAP';
             $class = 'status-warning';
             $rekomendasi = 'Tanah cukup lembap. Kurangi penyiraman jika hujan.';
         } elseif ($tanah > 85) {
-            // Terlalu basah
             $status = '🌊 TERLALU BASAH';
             $class = 'status-critical';
             $rekomendasi = 'Hentikan penyiraman! Perbaiki drainase untuk mencegah akar busuk.';
@@ -77,7 +98,6 @@ class SensorController extends Controller
             $rekomendasi = 'Kelembapan tanah normal.';
         }
 
-        // Faktor koreksi suhu dan udara (memperkuat atau memperlemah)
         if ($suhu > 30 && $udara < 50 && $tanah < 50) {
             $status = '🔥 KERING + PANAS';
             $class = 'status-critical';
@@ -107,10 +127,10 @@ class SensorController extends Controller
 
         if ($status === 'HAMA') {
             $title = '🚨 Peringatan Hama Terdeteksi!';
-            $message = "Sistem mendeteksi risiko serangan hama tinggi dengan nilai fuzzy {$nilai}. Segera periksa kondisi tanaman jagung Anda.";
+            $message = "Sistem mendeteksi risiko serangan hama tinggi dengan nilai hybrid {$nilai}. Segera periksa kondisi tanaman jagung Anda.";
         } elseif ($status === 'WASPADA') {
             $title = '⚠️ Status Waspada Hama';
-            $message = "Kondisi lingkungan mulai mengarah ke risiko hama (nilai fuzzy {$nilai}). Tingkatkan frekuensi monitoring.";
+            $message = "Kondisi lingkungan mulai mengarah ke risiko hama (nilai hybrid {$nilai}). Tingkatkan frekuensi monitoring.";
         } else {
             return;
         }
@@ -221,6 +241,7 @@ class SensorController extends Controller
         ];
     }
 
+    // ================== BUILD RIWAYAT HTML (DENGAN BADGE YOLO) ==================
     private function buildRiwayatHtml(Collection $fotoData): string
     {
         if ($fotoData->isEmpty()) {
@@ -231,8 +252,16 @@ class SensorController extends Controller
             $nilaiR = $this->resolveFuzzyValue($fd);
             [$statusR] = $this->getStatus($nilaiR);
             $badgeClass = $statusR === 'HAMA' ? 'chip-hama' : ($statusR === 'WASPADA' ? 'chip-waspada' : 'chip-aman');
+
+            $yoloBadge = '';
+            if ($fd->deteksi_yolo) {
+                $confidence = round($fd->confidence_yolo * 100);
+                $yoloBadge = '<span class="yolo-badge" style="position:absolute; top:4px; right:4px; background:' . ($confidence > 70 ? '#dc2626' : '#d97706') . '; color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; z-index:5;">🎯 ' . $fd->deteksi_yolo . ' (' . $confidence . '%)</span>';
+            }
+
             $html .= '<a href="' . asset('storage/' . $fd->image) . '" target="_blank" class="foto-item" title="' . $fd->created_at->format('d M Y H:i') . '">
                 <img src="' . asset('storage/' . $fd->image) . '" alt="Foto tanaman">
+                ' . $yoloBadge . '
                 <span class="foto-badge ' . $badgeClass . '">' . $statusR . '</span>
             </a>';
         }
@@ -261,19 +290,27 @@ class SensorController extends Controller
             $path = $request->file('image')->store('kamera', 'public');
         }
 
-        $nilai = $this->fuzzySugeno(
+        $nilaiFuzzy = $this->fuzzySugeno(
             $request->suhu_udara,
             $request->kelembapan_udara,
             $request->kelembapan_tanah
         );
-        [$status] = $this->getStatus($nilai);
+
+        // 🔥 HYBRID LOGIC
+        [$status] = $this->getHybridStatus(
+            $request->deteksi_yolo,
+            $request->confidence_yolo,
+            $nilaiFuzzy
+        );
 
         Cache::put('iot_live_data', [
             'suhu'             => $request->suhu_udara,
             'kelembapan_udara' => $request->kelembapan_udara,
             'kelembapan_tanah' => $request->kelembapan_tanah,
-            'nilai_fuzzy'      => round($nilai, 4),
+            'nilai_fuzzy'      => round($nilaiFuzzy, 4),
             'deteksi'          => $status,
+            'deteksi_yolo'     => $request->deteksi_yolo,
+            'confidence_yolo'  => $request->confidence_yolo,
             'image'            => $path ? asset('storage/' . $path) : null,
             'updated_at'       => now()->toIso8601String(),
         ], now()->addMinutes(7));
@@ -282,7 +319,7 @@ class SensorController extends Controller
             'suhu'             => $request->suhu_udara,
             'kelembapan_udara' => $request->kelembapan_udara,
             'kelembapan_tanah' => $request->kelembapan_tanah,
-            'nilai_fuzzy'      => $nilai,
+            'nilai_fuzzy'      => $nilaiFuzzy,
             'image'            => $path,
             'deteksi'          => $status,
             'deteksi_yolo'     => $request->deteksi_yolo,
@@ -290,13 +327,13 @@ class SensorController extends Controller
         ]);
 
         if (in_array($status, ['HAMA', 'WASPADA'])) {
-            $this->createNotification($status, $nilai, $sensor);
+            $this->createNotification($status, $nilaiFuzzy, $sensor);
         }
 
         return response()->json([
             'message'            => 'Data diproses',
             'status'             => $status,
-            'nilai'              => round($nilai, 4),
+            'nilai_fuzzy'        => round($nilaiFuzzy, 4),
             'deteksi_yolo'       => $request->deteksi_yolo,
             'confidence_yolo'    => $request->confidence_yolo,
             'stored_in_cache'    => true,
@@ -304,7 +341,7 @@ class SensorController extends Controller
         ], 201);
     }
 
-    // ================== MANUAL (AMBIL DATA REAL-TIME) ==================
+    // ================== MANUAL ==================
     public function manual()
     {
         if (Cache::has('iot_live_data')) {
@@ -324,19 +361,19 @@ class SensorController extends Controller
             }
         }
 
-        $nilai = $this->fuzzySugeno($suhu, $udara, $tanah);
-        [$status] = $this->getStatus($nilai);
+        $nilaiFuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);
+        [$status] = $this->getStatus($nilaiFuzzy);
 
         $sensor = SensorReading::create([
             'suhu'             => $suhu,
             'kelembapan_udara' => $udara,
             'kelembapan_tanah' => $tanah,
-            'nilai_fuzzy'      => $nilai,
+            'nilai_fuzzy'      => $nilaiFuzzy,
             'deteksi'          => $status,
         ]);
 
         if (in_array($status, ['HAMA', 'WASPADA'])) {
-            $this->createNotification($status, $nilai, $sensor);
+            $this->createNotification($status, $nilaiFuzzy, $sensor);
         }
 
         return redirect()->route('dashboard')
@@ -438,7 +475,6 @@ class SensorController extends Controller
         $nilai    = $latest ? $this->resolveFuzzyValue($latest) : 0;
         [$status, $class] = $this->getStatus($nilai);
 
-        // Data untuk status air (dari cache jika online, atau dari database terakhir)
         $waterStatus = '✅ CUKUP';
         $waterClass = 'status-good';
         $waterRecommendation = 'Kelembapan tanah normal.';
@@ -448,23 +484,21 @@ class SensorController extends Controller
             $cache = Cache::get('iot_live_data');
             $nilai = $cache['nilai_fuzzy'] ?? $nilai;
             [$status, $class] = $this->getStatus($nilai);
-            
-            // Ambil data untuk status air
+
             $suhu  = $cache['suhu'] ?? 0;
             $udara = $cache['kelembapan_udara'] ?? 0;
             $tanah = $cache['kelembapan_tanah'] ?? 0;
-            
+
             $water = $this->getWaterStatus($tanah, $udara, $suhu);
             $waterStatus = $water['status'];
             $waterClass = $water['class'];
             $waterRecommendation = $water['rekomendasi'];
             $waterTanah = $water['nilai_tanah'];
         } elseif ($latest) {
-            // Jika offline, ambil dari database terakhir
             $tanah = $latest->kelembapan_tanah ?? 0;
             $udara = $latest->kelembapan_udara ?? 0;
             $suhu  = $latest->suhu ?? 0;
-            
+
             $water = $this->getWaterStatus($tanah, $udara, $suhu);
             $waterStatus = $water['status'];
             $waterClass = $water['class'];
@@ -482,7 +516,7 @@ class SensorController extends Controller
         return view('dashboard', compact(
             'latest', 'data', 'nilai', 'status', 'class',
             'labels', 'suhu', 'suhu_udara', 'udara', 'tanah', 'fuzzyChart', 'isOnline',
-            'waterStatus', 'waterClass', 'waterRecommendation', 'waterTanah'  // ← tambahan untuk status air
+            'waterStatus', 'waterClass', 'waterRecommendation', 'waterTanah'
         ));
     }
 
@@ -491,14 +525,14 @@ class SensorController extends Controller
     {
         $statusGlobal = $this->getStatusGlobal();
         view()->share('statusGlobal', $statusGlobal);
- 
+
         $isOnline    = Cache::has('iot_live_data');
         $latest      = SensorReading::latest()->first();
         $data        = SensorReading::latest()->take(10)->get()->reverse()->values();
         $fuzzyValues = $data->map(fn($d) => $this->resolveFuzzyValue($d))->values()->toArray();
         $nilai       = count($fuzzyValues) ? end($fuzzyValues) : 0;
         [$status, $class] = $this->getStatus($nilai);
- 
+
         $diff = 0;
         if (count($fuzzyValues) > 1) {
             $totalDiff = 0;
@@ -507,7 +541,7 @@ class SensorController extends Controller
             }
             $diff = $totalDiff / (count($fuzzyValues) - 1);
         }
- 
+
         $prediksi = $prediksiStatus = [];
         for ($i = 1; $i <= 3; $i++) {
             $next = max(0, min(1, $nilai + $diff * $i));
@@ -515,13 +549,13 @@ class SensorController extends Controller
             [$ps] = $this->getStatus($next);
             $prediksiStatus[] = $ps;
         }
- 
+
         $labelsHistoris = $data->pluck('created_at')
             ->map(fn($d) => $d->format('H:i'))->values()->toArray();
- 
+
         $thresholdHama    = ThresholdSetting::getValue('threshold_hama',    0.70);
         $thresholdWaspada = ThresholdSetting::getValue('threshold_waspada', 0.45);
- 
+
         return view('prediksi', compact(
             'latest', 'nilai', 'status', 'class',
             'prediksi', 'prediksiStatus',
@@ -575,15 +609,22 @@ class SensorController extends Controller
             $nilai  = $cache['nilai_fuzzy'];
             [$status, $class] = $this->getStatus($nilai);
 
-            $latest = new \stdClass();
-            $latest->suhu             = $cache['suhu'];
-            $latest->kelembapan_udara = $cache['kelembapan_udara'];
-            $latest->kelembapan_tanah = $cache['kelembapan_tanah'];
-            $latest->image            = null;
-            $latest->created_at       = Carbon::parse($cache['updated_at'] ?? now());
+            // ✅ Ambil foto terakhir dari DB
+            $latest = SensorReading::whereNotNull('image')->latest()->first();
+
+            if (!$latest) {
+                $latest = new \stdClass();
+                $latest->suhu             = $cache['suhu'];
+                $latest->kelembapan_udara = $cache['kelembapan_udara'];
+                $latest->kelembapan_tanah = $cache['kelembapan_tanah'];
+                $latest->image            = null;
+                $latest->created_at       = Carbon::parse($cache['updated_at'] ?? now());
+                $latest->deteksi_yolo     = $cache['deteksi_yolo'] ?? null;
+                $latest->confidence_yolo  = $cache['confidence_yolo'] ?? null;
+            }
         } else {
-            $latest = SensorReading::latest()->first();
-            $nilai  = $this->resolveFuzzyValue($latest);
+            $latest = SensorReading::whereNotNull('image')->latest()->first();
+            $nilai  = $latest ? $this->resolveFuzzyValue($latest) : 0;
             [$status, $class] = $this->getStatus($nilai);
         }
 
@@ -710,7 +751,7 @@ class SensorController extends Controller
         $suhu  = (float) ($request->input('suhu',  28));
         $udara = (float) ($request->input('udara', 70));
         $tanah = (float) ($request->input('tanah', 60));
- 
+
         $sAman    = ThresholdSetting::getValue('suhu_aman',    22);
         $sWaspada = ThresholdSetting::getValue('suhu_waspada', 28);
         $sHama    = ThresholdSetting::getValue('suhu_hama',    32);
@@ -720,19 +761,19 @@ class SensorController extends Controller
         $tAman    = ThresholdSetting::getValue('tanah_aman',    55);
         $tWaspada = ThresholdSetting::getValue('tanah_waspada', 68);
         $tHama    = ThresholdSetting::getValue('tanah_hama',    80);
- 
+
         $dingin   = max(0, min(1, ($sAman    - $suhu)  / self::T_SUHU));
         $panas    = max(0, min(1, ($suhu  - $sWaspada) / max(0.01, $sHama - $sWaspada)));
         $hangat   = max(0, min(1, 1 - $dingin - $panas));
- 
+
         $kering_u = max(0, min(1, ($uAman    - $udara) / self::T_LEMBAP));
         $lembap_u = max(0, min(1, ($udara - $uWaspada) / max(0.01, $uHama - $uWaspada)));
         $normal_u = max(0, min(1, 1 - $kering_u - $lembap_u));
- 
+
         $kering_t = max(0, min(1, ($tAman    - $tanah) / self::T_LEMBAP));
         $lembap_t = max(0, min(1, ($tanah - $tWaspada) / max(0.01, $tHama - $tWaspada)));
         $normal_t = max(0, min(1, 1 - $kering_t - $lembap_t));
- 
+
         $rulesDef = [
             ['label'=>'panas+lembap_u+lembap_t', 'alpha'=>min($panas,$lembap_u,$lembap_t), 'z'=>1.00],
             ['label'=>'panas+lembap_u+normal_t', 'alpha'=>min($panas,$lembap_u,$normal_t), 'z'=>0.85],
@@ -762,7 +803,7 @@ class SensorController extends Controller
             ['label'=>'dingin+kering_u+normal_t','alpha'=>min($dingin,$kering_u,$normal_t),'z'=>0.15],
             ['label'=>'dingin+kering_u+kering_t','alpha'=>min($dingin,$kering_u,$kering_t),'z'=>0.10],
         ];
- 
+
         $num = $den = 0;
         $activeRules = [];
         foreach ($rulesDef as $rule) {
@@ -777,10 +818,10 @@ class SensorController extends Controller
                 ];
             }
         }
- 
+
         $nilaiFuzzy = $den > 0 ? $num / $den : 0;
         [$status] = $this->getStatus($nilaiFuzzy);
- 
+
         return response()->json([
             'input' => [
                 'suhu'  => $suhu,
@@ -889,7 +930,7 @@ class SensorController extends Controller
                 'message' => 'Semua data berhasil dihapus.'
             ]);
         } catch (\Exception $e) {
-            Log::error('Gagal hapus semua数据: ' . $e->getMessage());
+            Log::error('Gagal hapus semua data: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()

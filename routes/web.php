@@ -8,7 +8,6 @@ Route::get('/', function () {
     return redirect()->route('dashboard');
 });
 
-
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [SensorController::class, 'index'])->name('dashboard');
     Route::get('/prediksi',   [SensorController::class, 'prediksi'])->name('prediksi');
@@ -17,9 +16,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/live-data',  [SensorController::class, 'liveData'])->name('live-data');
     Route::post('/manual',    [SensorController::class, 'manual'])->name('manual');
 
-    // ============================================================
-    // RUTE NOTIFIKASI
-    // ============================================================
     Route::prefix('notifications')->name('notifications.')->group(function () {
         Route::get('/', [NotificationController::class, 'index'])->name('index');
         Route::post('/{id}/read', [NotificationController::class, 'markAsRead'])->name('mark-read');
@@ -42,6 +38,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('/riwayat/{id}', [SensorController::class, 'adminDestroyRiwayat'])->name('riwayat.delete');
 });
 
+// ============================================================
+// RUTE API
+// ============================================================
+Route::post('/api/sensor', [SensorController::class, 'store']);
+Route::get('/api/kamera/latest', [SensorController::class, 'kameraLatest'])->name('kamera.api');
 
 if (app()->environment('local', 'staging')) {
     Route::get('/debug/fuzzy', [SensorController::class, 'debugFuzzy'])->name('debug.fuzzy');

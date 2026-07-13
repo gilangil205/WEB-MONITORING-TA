@@ -64,7 +64,6 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
 .chip-aman    { background:#16a34a; color:white; }
 .chip-offline { background:#64748b; color:white; }
 
-{{-- Badge LIVE — dikontrol visibility-nya oleh JS --}}
 .badge-live {
     position:absolute; top:12px; left:12px;
     background:#dc2626; color:white; font-size:10px; font-weight:700;
@@ -123,13 +122,11 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
 }
 </style>
 
-{{-- ── HEADER ── --}}
 <div class="page-header">
     <div>
         <h1>📷 Monitoring Visual Tanaman Jagung</h1>
         <p>Pemantauan kamera lapangan secara real-time disertai analisis deteksi hama berbasis Fuzzy Sugeno</p>
     </div>
-    {{-- Pill header dikontrol JS — render awal dari PHP --}}
     <div id="header-pill">
         @if($isOnline)
             <div class="live-pill"><span class="live-dot"></span> LIVE MONITORING</div>
@@ -139,9 +136,7 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
     </div>
 </div>
 
-{{-- ── MINI KARTU SENSOR ── --}}
 <div class="mini-grid">
-
     <div class="mini-card">
         <span class="mc-icon">🌡️</span>
         <div class="mc-info">
@@ -191,13 +186,10 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
             </div>
         </div>
     </div>
-
 </div>
 
-{{-- ── GRID KAMERA + STATUS ── --}}
 <div class="kamera-grid">
 
-    {{-- PANEL KAMERA --}}
     <div class="panel">
         <div class="panel-header">
             <div class="panel-title">📸 Kamera Lapangan — Tanaman Jagung</div>
@@ -208,15 +200,7 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
         <div class="panel-body">
 
             <div class="kamera-box" id="camBox">
-
-                {{--
-                    ✅ PERBAIKAN BUG: Badge LIVE sekarang dikontrol penuh oleh JavaScript.
-                    Render awal dari PHP hanya menentukan apakah badge tampil saat halaman pertama dibuka.
-                    Setelah itu, JS yang mengontrol show/hide badge ini setiap polling 5 detik.
-                    Sebelumnya: badge tidak pernah disembunyikan saat alat offline setelah page load.
-                --}}
-                <div class="badge-live" id="badge-live"
-                     style="{{ $isOnline ? '' : 'display:none;' }}">
+                <div class="badge-live" id="badge-live" style="{{ $isOnline ? '' : 'display:none;' }}">
                     <span style="width:6px;height:6px;background:white;border-radius:50%;display:inline-block;animation:blink 1s infinite;"></span>
                     LIVE
                 </div>
@@ -238,7 +222,6 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
         </div>
     </div>
 
-    {{-- PANEL STATUS DETEKSI --}}
     <div style="display:flex; flex-direction:column; gap:16px;">
 
         <div class="panel">
@@ -307,7 +290,6 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
             </div>
         </div>
 
-        {{-- Rekomendasi --}}
         <div class="panel">
             <div class="panel-header">
                 <div class="panel-title">📋 Rekomendasi Tindakan</div>
@@ -362,7 +344,6 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
     </div>
 </div>
 
-{{-- ── RIWAYAT FOTO ── --}}
 <div class="panel">
     <div class="panel-header">
         <div class="panel-title">🖼️ Riwayat Foto Kamera (5 Terakhir)</div>
@@ -376,7 +357,6 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
 </div>
 
 <script>
-// ── FETCH POLLING KAMERA (setiap 5 detik) ─────────────────────────────────────
 function fetchLatestCameraData() {
     fetch("{{ route('kamera.api') }}")
         .then(function(r) { return r.json(); })
@@ -387,19 +367,13 @@ function fetchLatestCameraData() {
                 return;
             }
 
-            // ── ONLINE ────────────────────────────────────────────────────────
-
-            // ✅ PERBAIKAN: Tampilkan badge LIVE dan header pill saat online
             var badgeLive = document.getElementById('badge-live');
             if (badgeLive) badgeLive.style.display = 'flex';
 
             var headerPill = document.getElementById('header-pill');
             if (headerPill) headerPill.innerHTML =
-                '<div class="live-pill">' +
-                '  <span class="live-dot"></span> LIVE MONITORING' +
-                '</div>';
+                '<div class="live-pill"><span class="live-dot"></span> LIVE MONITORING</div>';
 
-            // 1. Mini card nilai sensor
             elSet('mini-suhu',        data.suhu);
             elSet('mini-kel-udara',   data.kelembapan_udara);
             elSet('mini-kel-tanah',   data.kelembapan_tanah);
@@ -408,7 +382,6 @@ function fetchLatestCameraData() {
             elSet('detail-kel-tanah', data.kelembapan_tanah + ' %');
             elSet('detail-time',      data.formatted_time);
 
-            // 2. Mini card status
             var miniCard = document.getElementById('mini-card-status');
             var miniIcon = document.getElementById('mini-icon-status');
             var miniVal  = document.getElementById('mini-val-status');
@@ -425,14 +398,11 @@ function fetchLatestCameraData() {
                 else                                miniIcon.innerText = '✅';
             }
 
-            // 3. Kamera box (gambar dari ESP32-CAM)
-            // data.image = URL lengkap foto terbaru dari cache (kiriman IoT terakhir)
             var cw = document.getElementById('cam-content-wrapper');
             if (cw) {
                 if (data.image) {
                     var chipClass = data.status === 'HAMA' ? 'chip-hama'
                                  : (data.status === 'WASPADA' ? 'chip-waspada' : 'chip-aman');
-                    // Cache-buster agar browser tidak pakai gambar lama
                     var imageUrl = data.image + '?t=' + Date.now();
                     cw.innerHTML =
                         '<img src="' + imageUrl + '" alt="Gambar tanaman jagung dari kamera IoT">' +
@@ -450,7 +420,6 @@ function fetchLatestCameraData() {
                 }
             }
 
-            // 4. Panel status besar
             var panelBesar = document.getElementById('panel-status-besar');
             var sbIcon     = document.getElementById('sb-icon');
             var sbVal      = document.getElementById('sb-val');
@@ -478,7 +447,6 @@ function fetchLatestCameraData() {
                 if (sbDesc)   sbDesc.innerText = 'Nilai Fuzzy Sugeno < 0.45. Kondisi tidak mendukung perkembangan hama. Pertahankan kondisi saat ini.';
             }
 
-            // 5. Rekomendasi tindakan
             var rekList = document.getElementById('rekomendasi-list');
             if (rekList && data.rekomendasi) {
                 rekList.innerHTML = '';
@@ -491,7 +459,6 @@ function fetchLatestCameraData() {
                 });
             }
 
-            // 6. Riwayat foto (5 foto terbaru dari DB yang punya gambar)
             var riwayatWrapper = document.getElementById('riwayat-foto-wrapper');
             if (riwayatWrapper && data.riwayat_html) {
                 riwayatWrapper.innerHTML = data.riwayat_html;
@@ -502,17 +469,13 @@ function fetchLatestCameraData() {
         });
 }
 
-// ── Tampilan OFFLINE ────────────────────────────────────────────────────────────
 function setKameraOffline() {
-    // ✅ PERBAIKAN: Sembunyikan badge LIVE dan ganti header pill saat offline
     var badgeLive = document.getElementById('badge-live');
     if (badgeLive) badgeLive.style.display = 'none';
 
     var headerPill = document.getElementById('header-pill');
-    if (headerPill) headerPill.innerHTML =
-        '<div class="offline-pill">📡 ALAT OFFLINE</div>';
+    if (headerPill) headerPill.innerHTML = '<div class="offline-pill">📡 ALAT OFFLINE</div>';
 
-    // Mini card sensor → tampilkan --
     ['mini-suhu','mini-kel-udara','mini-kel-tanah'].forEach(function(id) {
         var e = document.getElementById(id); if (e) e.innerText = '--';
     });
@@ -558,7 +521,6 @@ function elSet(id, val) {
     if (e) e.innerText = val;
 }
 
-// Panggil langsung saat halaman dibuka, lalu ulangi setiap 5 detik
 fetchLatestCameraData();
 setInterval(fetchLatestCameraData, 5000);
 </script>
