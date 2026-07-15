@@ -1,0 +1,11 @@
+{
+    "build": {
+        "builder": "NIXPACKS"
+    },
+    "deploy": {
+        "startCommand": "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"
+    },
+    "php": {
+        "extensions": ["intl", "pdo_pgsql", "pgsql"]
+    }
+}
