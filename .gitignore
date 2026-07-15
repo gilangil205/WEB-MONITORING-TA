@@ -12,7 +12,6 @@
 /.vscode
 /.zed
 /auth.json
-#/vendor
 /node_modules
 /public/build
 /public/hot
