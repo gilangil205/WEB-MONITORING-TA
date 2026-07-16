@@ -22,12 +22,10 @@ class SensorController extends Controller
     // ================== HELPER: HYBRID LOGIC (70% YOLO + 30% FUZZY) ==================
     private function getHybridStatus(?string $deteksiYolo, ?float $confidenceYolo, float $nilaiFuzzy): array
     {
-        // Jika tidak ada data YOLO, fallback ke Fuzzy murni
         if (empty($deteksiYolo) || $confidenceYolo === null || $confidenceYolo < 0.3) {
             return $this->getStatus($nilaiFuzzy);
         }
 
-        // Deteksi keyword hama
         $isDetected = stripos($deteksiYolo, 'terdeteksi') !== false ||
                       stripos($deteksiYolo, 'detected') !== false ||
                       stripos($deteksiYolo, 'hama') !== false ||
@@ -39,7 +37,6 @@ class SensorController extends Controller
             $yoloScore = 0;
         }
 
-        // 🔥 70% YOLO + 30% Fuzzy
         $nilaiHybrid = ($yoloScore * 0.7) + ($nilaiFuzzy * 0.3);
         $nilaiHybrid = max(0, min(1, $nilaiHybrid));
 
@@ -166,8 +163,8 @@ class SensorController extends Controller
                 'status_hama'         => $d['deteksi']          ?? 'AMAN',
                 'deteksi'             => $d['deteksi']          ?? 'AMAN',
                 'image_url'           => $d['image']            ?? null,
-                'deteksi_yolo'        => $d['deteksi_yolo']     ?? null,           // ✅ PERBAIKAN: Tambah explicit
-                'confidence_yolo'     => $d['confidence_yolo']  ?? null,           // ✅ PERBAIKAN: Tambah explicit
+                'deteksi_yolo'        => $d['deteksi_yolo']     ?? null,
+                'confidence_yolo'     => $d['confidence_yolo']  ?? null,
                 'timestamp_iso'       => $updatedAt->toISOString(),
                 'timestamp_formatted' => $updatedAt->format('d M Y, H:i'),
                 'timestamp_time'      => $updatedAt->format('H:i'),
@@ -188,8 +185,8 @@ class SensorController extends Controller
             'status_hama'         => 'OFFLINE',
             'deteksi'             => 'OFFLINE',
             'image_url'           => null,
-            'deteksi_yolo'        => null,                                        // ✅ PERBAIKAN: Tambah di offline case
-            'confidence_yolo'     => null,                                        // ✅ PERBAIKAN: Tambah di offline case
+            'deteksi_yolo'        => null,
+            'confidence_yolo'     => null,
             'timestamp_iso'       => null,
             'timestamp_formatted' => null,
             'timestamp_time'      => null,
@@ -222,8 +219,8 @@ class SensorController extends Controller
             'nilai'               => round($d['nilai_fuzzy'], 4),
             'status'              => $d['deteksi'],
             'image'               => $d['image'] ?? null,
-            'deteksi_yolo'        => $d['deteksi_yolo'] ?? null,                 // ✅ PERBAIKAN: Tambah explicit
-            'confidence_yolo'     => $d['confidence_yolo'] ?? null,               // ✅ PERBAIKAN: Tambah explicit
+            'deteksi_yolo'        => $d['deteksi_yolo'] ?? null,
+            'confidence_yolo'     => $d['confidence_yolo'] ?? null,
             'formatted_timestamp' => $updatedAt->format('d M Y — H:i:s'),
             'formatted_time'      => $updatedAt->format('H:i, d M Y'),
             'rekomendasi'         => $rekomendasi,
@@ -257,7 +254,6 @@ class SensorController extends Controller
         ];
     }
 
-    // ================== BUILD RIWAYAT HTML (DENGAN BADGE YOLO) ==================
     private function buildRiwayatHtml(Collection $fotoData): string
     {
         if ($fotoData->isEmpty()) {
@@ -312,7 +308,6 @@ class SensorController extends Controller
             $request->kelembapan_tanah
         );
 
-        // 🔥 HYBRID LOGIC
         [$status] = $this->getHybridStatus(
             $request->deteksi_yolo,
             $request->confidence_yolo,
@@ -600,12 +595,11 @@ class SensorController extends Controller
         }
 
         $data = $query->paginate(10);
+
+        // ✅ PERBAIKAN: Gunakan status yang sudah disimpan di database (hasil hybrid)
         $data->getCollection()->transform(function ($item) {
-            $nilai = $this->resolveFuzzyValue($item);
-            [$status] = $this->getStatus($nilai);
-            $item->nilai   = round($nilai, 3);
-            $item->status  = $status;
-            $item->deteksi = $status;
+            $item->nilai   = round($item->nilai_fuzzy ?? 0, 3);
+            $item->status  = $item->deteksi; // status sudah benar dari hybrid
             return $item;
         });
 
@@ -625,7 +619,6 @@ class SensorController extends Controller
             $nilai  = $cache['nilai_fuzzy'];
             [$status, $class] = $this->getStatus($nilai);
 
-            // ✅ Ambil foto terakhir dari DB
             $latest = SensorReading::whereNotNull('image')->latest()->first();
 
             if (!$latest) {
