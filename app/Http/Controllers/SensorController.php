@@ -166,6 +166,8 @@ class SensorController extends Controller
                 'status_hama'         => $d['deteksi']          ?? 'AMAN',
                 'deteksi'             => $d['deteksi']          ?? 'AMAN',
                 'image_url'           => $d['image']            ?? null,
+                'deteksi_yolo'        => $d['deteksi_yolo']     ?? null,           // ✅ PERBAIKAN: Tambah explicit
+                'confidence_yolo'     => $d['confidence_yolo']  ?? null,           // ✅ PERBAIKAN: Tambah explicit
                 'timestamp_iso'       => $updatedAt->toISOString(),
                 'timestamp_formatted' => $updatedAt->format('d M Y, H:i'),
                 'timestamp_time'      => $updatedAt->format('H:i'),
@@ -176,12 +178,24 @@ class SensorController extends Controller
         }
 
         return response()->json([
-            'success' => false, 'isOnline' => false, 'device' => 'OFFLINE',
-            'suhu' => null, 'kelembapan_udara' => null, 'kelembapan_tanah' => null,
-            'nilai_fuzzy' => null, 'status_hama' => 'OFFLINE', 'deteksi' => 'OFFLINE',
-            'image_url' => null, 'timestamp_iso' => null, 'timestamp_formatted' => null,
-            'timestamp_time' => null, 'timestamp_date' => null, 'updated_at' => null,
-            'sensor' => null,
+            'success'             => false,
+            'isOnline'            => false,
+            'device'              => 'OFFLINE',
+            'suhu'                => null,
+            'kelembapan_udara'    => null,
+            'kelembapan_tanah'    => null,
+            'nilai_fuzzy'         => null,
+            'status_hama'         => 'OFFLINE',
+            'deteksi'             => 'OFFLINE',
+            'image_url'           => null,
+            'deteksi_yolo'        => null,                                        // ✅ PERBAIKAN: Tambah di offline case
+            'confidence_yolo'     => null,                                        // ✅ PERBAIKAN: Tambah di offline case
+            'timestamp_iso'       => null,
+            'timestamp_formatted' => null,
+            'timestamp_time'      => null,
+            'timestamp_date'      => null,
+            'updated_at'          => null,
+            'sensor'              => null,
         ]);
     }
 
@@ -208,6 +222,8 @@ class SensorController extends Controller
             'nilai'               => round($d['nilai_fuzzy'], 4),
             'status'              => $d['deteksi'],
             'image'               => $d['image'] ?? null,
+            'deteksi_yolo'        => $d['deteksi_yolo'] ?? null,                 // ✅ PERBAIKAN: Tambah explicit
+            'confidence_yolo'     => $d['confidence_yolo'] ?? null,               // ✅ PERBAIKAN: Tambah explicit
             'formatted_timestamp' => $updatedAt->format('d M Y — H:i:s'),
             'formatted_time'      => $updatedAt->format('H:i, d M Y'),
             'rekomendasi'         => $rekomendasi,
