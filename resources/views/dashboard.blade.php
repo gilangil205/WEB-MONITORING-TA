@@ -16,7 +16,7 @@
     </div>
 </div>
 
-{{-- ── BANNER OFFLINE (tersembunyi saat online) ── --}}
+{{-- ── BANNER OFFLINE ── --}}
 <div id="offline-banner" style="display:none; background:#fef2f2; border:1px solid #fca5a5;
     border-radius:10px; padding:12px 18px; margin-bottom:16px; color:#dc2626;
     font-size:13px; font-weight:600; display:flex; align-items:center; gap:10px;">
@@ -101,7 +101,7 @@
     </div>
 </div>
 
-{{-- ── KARTU SENSOR ── --}}
+{{-- ── KARTU SENSOR (4 CARD) ── --}}
 <div class="sensor-grid">
 
     {{-- Suhu --}}
@@ -327,7 +327,7 @@
     </div>
 </div>
 
-{{-- ── TABEL DATA TERAKHIR (dari DB, bukan live) ── --}}
+{{-- ── TABEL DATA TERAKHIR ── --}}
 <div class="panel" style="margin-bottom:18px;">
     <div class="panel-header">
         <div class="panel-title">📋 Riwayat Data Sensor (tersimpan setiap 15 menit)</div>
@@ -380,9 +380,9 @@
     </div>
 </div>
 
-{{-- ── SCRIPT REAL-TIME (FETCH API — TANPA RELOAD HALAMAN) ── --}}
+{{-- ── SCRIPT REAL-TIME ── --}}
 <script>
-    // ── Data awal dari server (untuk inisialisasi grafik) ──────────────────────────
+    // ── Data awal dari server ──────────────────────────────────────────────────
     var labels      = @json($labels);
     var suhuData    = @json($suhu);
     var udaraData   = @json($udara);
@@ -394,7 +394,6 @@
     var chartSensorInstance;
     var chartFuzzyInstance;
 
-    // ── Animasi awal meter pointer ─────────────────────────────────────────────────
     window.addEventListener('load', function () {
         var ptr = document.getElementById('meterPtr');
         if (ptr && isOnlineInit) {
@@ -404,7 +403,6 @@
         }
     });
 
-    // ── Inisialisasi Grafik Sensor ─────────────────────────────────────────────────
     var ctxSensor = document.getElementById('chartSensor').getContext('2d');
     chartSensorInstance = new Chart(ctxSensor, {
         type: 'line',
@@ -419,7 +417,6 @@
         options: { responsive: true, maintainAspectRatio: false }
     });
 
-    // ── Inisialisasi Grafik Fuzzy ──────────────────────────────────────────────────
     var ctxFuzzy = document.getElementById('chartFuzzy').getContext('2d');
     chartFuzzyInstance = new Chart(ctxFuzzy, {
         type: 'line',
@@ -442,10 +439,8 @@
         }
     });
 
-    // ── STATE POLLING ──────────────────────────────────────────────────────────────
     var lastLiveTimestamp = null;
 
-    // ── FUNGSI UTAMA POLLING (berjalan setiap 5 detik) ────────────────────────────
     function perbaruiDashboard() {
         fetch('/live-data')
             .then(function(r) { return r.json(); })
