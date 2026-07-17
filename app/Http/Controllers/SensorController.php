@@ -20,121 +20,27 @@ class SensorController extends Controller
     private const T_LEMBAP = 5;
 
     // ================== HELPER: HYBRID LOGIC (70% YOLO + 30% FUZZY) ==================
-    // ⭐ FIXED VERSION - Now properly handles YOLO detection with negation check
     private function getHybridStatus(?string $deteksiYolo, ?float $confidenceYolo, float $nilaiFuzzy): array
     {
-        /**
-         * HYBRID DECISION LOGIC
-         * 
-         * Alur:
-         * 1. Jika YOLO kosong atau confidence < 0.3 → fallback ke Fuzzy murni (bobot 100% Fuzzy)
-         * 2. Jika YOLO ada dan confidence >= 0.3 → hitung hybrid dengan bobot 70% YOLO + 30% Fuzzy
-         * 3. Return nilai 0-1 untuk status decision
-         * 
-         * @param string|null $deteksiYolo - YOLO detection output (string atau JSON)
-         * @param float|null $confidenceYolo - YOLO confidence score (0-1)
-         * @param float $nilaiFuzzy - Hasil Fuzzy Sugeno (0-1)
-         * @return array - [status, css_class]
-         */
-        
-        // FALLBACK: Jika YOLO data tidak ada atau confidence rendah
         if (empty($deteksiYolo) || $confidenceYolo === null || $confidenceYolo < 0.3) {
-            // Confidence terlalu rendah → gunakan Fuzzy murni
-            // Ini adalah keputusan design yang safe untuk robustness
             return $this->getStatus($nilaiFuzzy);
         }
 
-        // YOLO SCORE INTERPRETATION
-        // ✨ IMPROVED: Now handles negation context properly
-        $yoloScore = $this->interpretYoloDetection($deteksiYolo, $confidenceYolo);
+        $isDetected = stripos($deteksiYolo, 'terdeteksi') !== false ||
+                      stripos($deteksiYolo, 'detected') !== false ||
+                      stripos($deteksiYolo, 'hama') !== false ||
+                      stripos($deteksiYolo, 'tikus') !== false;
 
-        // HYBRID CALCULATION: 70% YOLO + 30% Fuzzy (Maintained per methodology)
+        if ($isDetected) {
+            $yoloScore = max($confidenceYolo, 0.7);
+        } else {
+            $yoloScore = 0;
+        }
+
         $nilaiHybrid = ($yoloScore * 0.7) + ($nilaiFuzzy * 0.3);
-        
-        // Ensure value dalam range [0, 1]
         $nilaiHybrid = max(0, min(1, $nilaiHybrid));
 
-        // DECISION: Convert hybrid value to status
         return $this->getStatus($nilaiHybrid);
-    }
-
-    // ================== HELPER: INTERPRET YOLO DETECTION ==================
-    // ✨ NEW METHOD - Better YOLO output handling dengan negation support
-    /**
-     * Interpret YOLO detection string dengan proper logic
-     * 
-     * Handles:
-     * - String format: "Tidak Ada Hama", "Tikus Terdeteksi", etc
-     * - JSON format: {"detected": false, "confidence": 0.92, ...}
-     * - Negation context: "Tidak Ada Hama" → NO PEST (tidak "PEST terdeteksi")
-     * 
-     * @param string $deteksiYolo - YOLO output (string or JSON string)
-     * @param float $confidenceYolo - Confidence score
-     * @return float - yolo_score (0 = no pest, >= 0.7 = pest detected)
-     */
-    private function interpretYoloDetection(string $deteksiYolo, float $confidenceYolo): float
-    {
-        // Try parsing JSON first
-        $jsonData = json_decode($deteksiYolo, true);
-        if (is_array($jsonData) && isset($jsonData['detected'])) {
-            // JSON format: gunakan boolean flag langsung
-            return $jsonData['detected'] === true ? max($confidenceYolo, 0.7) : 0;
-        }
-
-        // String format: improved keyword matching dengan negation support
-        $deteksi = strtolower(trim($deteksiYolo));
-
-        // PEST KEYWORDS: menunjukkan hama terdeteksi
-        $pestKeywords = [
-            'terdeteksi',      // "Hama Terdeteksi"
-            'detected',        // "Pest Detected"
-            'found',           // "Pest Found"
-            'ada hama',        // "Ada Hama"
-            'tikus',           // "Tikus" atau "Tikus Terdeteksi"
-            'mouse',           // "Mouse"
-            'rat',             // "Rat"
-            'serangga',        // "Serangga"
-            'insect',          // "Insect"
-            'hama'             // "Hama" (tetapi harus tidak ada negation)
-        ];
-
-        // NEGATION KEYWORDS: menunjukkan TIDAK ada hama
-        $negationKeywords = [
-            'tidak',           // "Tidak Ada Hama"
-            'tidak ada',       // "Tidak Ada Hama"
-            'no ',             // "No Pest", "No Detection"
-            'none',            // "None"
-            'belum',           // "Belum Ada Hama"
-            'empty',           // "Empty / Kosong"
-            'clear',           // "Clear / Bersih"
-            'aman'             // "Aman"
-        ];
-
-        // STEP 1: Check apakah ada negation keyword di awal atau di tengah
-        foreach ($negationKeywords as $neg) {
-            if (strpos($deteksi, $neg) !== false) {
-                // Negation found → strong indicator of NO PEST
-                // Except untuk "belum" yang bisa berarti belum ada tapi bisa ada nanti
-                if ($neg === 'belum' && $confidenceYolo > 0.8) {
-                    // "Belum ada tapi confidence tinggi" → warning sign
-                    return 0.3;  // Lower score but not zero
-                }
-                return 0;  // NO PEST
-            }
-        }
-
-        // STEP 2: Check apakah ada pest keyword (hanya jika tidak ada negation)
-        foreach ($pestKeywords as $pest) {
-            if (strpos($deteksi, $pest) !== false) {
-                // Pest keyword found → PEST DETECTED
-                return max($confidenceYolo, 0.7);  // Minimum score 0.7 untuk detected
-            }
-        }
-
-        // STEP 3: Jika tidak ada keyword yang match → NO DETECTION (safe default)
-        // Better to assume no pest than false positive
-        Log::debug('YOLO: No keyword matched', ['input' => $deteksiYolo, 'confidence' => $confidenceYolo]);
-        return 0;
     }
 
     // ================== HELPER: RESOLVE NILAI FUZZY ==================
@@ -192,49 +98,105 @@ class SensorController extends Controller
         if ($suhu > 30 && $udara < 50 && $tanah < 50) {
             $status = '🔥 KERING + PANAS';
             $class = 'status-critical';
-            $rekomendasi = 'Kondisi ekstrem: PANAS + KERING! Tingkatkan penyiraman segera.';
+            $rekomendasi = 'Kondisi panas dan udara kering mempercepat penguapan. Segera siram!';
+        } elseif ($suhu > 30 && $tanah < 60) {
+            $status = '☀️ KERING & PANAS';
+            $class = 'status-warning';
+            $rekomendasi = 'Suhu tinggi. Periksa kelembapan tanah dan siram jika perlu.';
+        } elseif ($suhu < 20 && $tanah > 75) {
+            $status = '🥶 DINGIN & BASAH';
+            $class = 'status-warning';
+            $rekomendasi = 'Suhu rendah dan tanah basah. Kurangi penyiraman.';
         }
 
         return [
-            'status'      => $status,
-            'class'       => $class,
+            'status' => $status,
+            'class' => $class,
             'rekomendasi' => $rekomendasi,
             'nilai_tanah' => $tanah,
         ];
     }
 
-    // ================== LIVE DATA ENDPOINT ==================
-    public function liveData()
+    // ================== HELPER: BUAT NOTIFIKASI ==================
+    private function createNotification(string $status, float $nilai, ?SensorReading $sensor = null)
     {
-        $isOnline = Cache::has('iot_live_data');
+        $users = User::whereIn('role', ['user', 'admin'])->get();
 
-        if (!$isOnline) {
-            return response()->json([
-                'success'   => false,
-                'isOnline'  => false,
-                'message'   => 'IoT device offline'
-            ], 200);
+        if ($status === 'HAMA') {
+            $title = '🚨 Peringatan Hama Terdeteksi!';
+            $message = "Sistem mendeteksi risiko serangan hama tinggi dengan nilai hybrid {$nilai}. Segera periksa kondisi tanaman jagung Anda.";
+        } elseif ($status === 'WASPADA') {
+            $title = '⚠️ Status Waspada Hama';
+            $message = "Kondisi lingkungan mulai mengarah ke risiko hama (nilai hybrid {$nilai}). Tingkatkan frekuensi monitoring.";
+        } else {
+            return;
         }
 
-        $d = Cache::get('iot_live_data');
-        $updatedAt = isset($d['updated_at']) ? Carbon::parse($d['updated_at']) : now();
+        foreach ($users as $user) {
+            Notification::create([
+                'user_id' => $user->id,
+                'title' => $title,
+                'message' => $message,
+                'status' => $status,
+                'fuzzy_value' => $nilai,
+                'sensor_reading_id' => $sensor?->id,
+                'is_read' => false,
+            ]);
+        }
+    }
+
+    // ================== ENDPOINT: /live-data ==================
+    public function liveData()
+    {
+        if (Cache::has('iot_live_data')) {
+            $d         = Cache::get('iot_live_data');
+            $updatedAt = isset($d['updated_at']) ? Carbon::parse($d['updated_at']) : now();
+
+            return response()->json([
+                'success'             => true,
+                'isOnline'            => true,
+                'device'              => 'ONLINE',
+                'suhu'                => $d['suhu']             ?? null,
+                'kelembapan_udara'    => $d['kelembapan_udara'] ?? null,
+                'kelembapan_tanah'    => $d['kelembapan_tanah'] ?? null,
+                'nilai_fuzzy'         => $d['nilai_fuzzy']      ?? 0,
+                'status_hama'         => $d['deteksi']          ?? 'AMAN',
+                'deteksi'             => $d['deteksi']          ?? 'AMAN',
+                'image_url'           => $d['image']            ?? null,
+                'deteksi_yolo'        => $d['deteksi_yolo']     ?? null,
+                'confidence_yolo'     => $d['confidence_yolo']  ?? null,
+                'timestamp_iso'       => $updatedAt->toISOString(),
+                'timestamp_formatted' => $updatedAt->format('d M Y, H:i'),
+                'timestamp_time'      => $updatedAt->format('H:i'),
+                'timestamp_date'      => $updatedAt->format('d M'),
+                'updated_at'          => $d['updated_at']       ?? null,
+                'sensor'              => $d,
+            ]);
+        }
 
         return response()->json([
-            'success'             => true,
-            'isOnline'            => true,
-            'suhu'                => $d['suhu'] ?? null,
-            'kelembapan_udara'    => $d['kelembapan_udara'] ?? null,
-            'kelembapan_tanah'    => $d['kelembapan_tanah'] ?? null,
-            'nilai'               => $d['nilai_fuzzy'] ?? 0,
-            'status'              => $d['deteksi'] ?? 'AMAN',
-            'image'               => $d['image'] ?? null,
-            'deteksi_yolo'        => $d['deteksi_yolo'] ?? null,
-            'confidence_yolo'     => $d['confidence_yolo'] ?? null,
-            'formatted_timestamp' => $updatedAt->format('d M Y — H:i:s'),
+            'success'             => false,
+            'isOnline'            => false,
+            'device'              => 'OFFLINE',
+            'suhu'                => null,
+            'kelembapan_udara'    => null,
+            'kelembapan_tanah'    => null,
+            'nilai_fuzzy'         => null,
+            'status_hama'         => 'OFFLINE',
+            'deteksi'             => 'OFFLINE',
+            'image_url'           => null,
+            'deteksi_yolo'        => null,
+            'confidence_yolo'     => null,
+            'timestamp_iso'       => null,
+            'timestamp_formatted' => null,
+            'timestamp_time'      => null,
+            'timestamp_date'      => null,
+            'updated_at'          => null,
+            'sensor'              => null,
         ]);
     }
 
-    // ================== KAMERA LATEST ENDPOINT ==================
+    // ================== ENDPOINT: /api/kamera/latest ==================
     public function kameraLatest()
     {
         if (Cache::has('iot_live_data')) {
@@ -266,7 +228,6 @@ class SensorController extends Controller
         ]);
     }
 
-    // ================== REKOMENDASI BY STATUS ==================
     private function getRekomendasiByStatus(string $status): array
     {
         if ($status === 'HAMA') {
@@ -293,83 +254,40 @@ class SensorController extends Controller
         ];
     }
 
-    // ================== RIWAYAT HTML BUILDER ==================
-    // ✨ FIXED - Now uses stored status instead of recalculating
     private function buildRiwayatHtml(Collection $fotoData): string
     {
-        /**
-         * Build HTML untuk photo history gallery
-         * 
-         * PENTING: Menggunakan STORED status dari database, bukan recalculate Fuzzy
-         * Ini untuk memastikan consistency antara dashboard dan riwayat
-         * 
-         * ✅ FIXED: Tidak lagi recalculate Fuzzy-only
-         * ✅ FIXED: Gunakan stored hybrid status dari column 'deteksi'
-         * ✅ NEW: Display YOLO info sebagai reference badge
-         */
         if ($fotoData->isEmpty()) {
             return '<div class="foto-placeholder">📷 Belum ada foto dari kamera IoT.</div>';
         }
-
         $html = '<div class="foto-grid">';
-        
         foreach ($fotoData as $fd) {
-            // ✅ FIXED: Use stored status (hybrid) dari DB
-            // Ini adalah sumber kebenaran untuk status
-            $statusR = $fd->deteksi;  
-            
-            // Determine badge styling berdasarkan status
-            $badgeClass = $statusR === 'HAMA' ? 'chip-hama' : 
-                         ($statusR === 'WASPADA' ? 'chip-waspada' : 'chip-aman');
+            $nilaiR = $this->resolveFuzzyValue($fd);
+            [$statusR] = $this->getStatus($nilaiR);
+            $badgeClass = $statusR === 'HAMA' ? 'chip-hama' : ($statusR === 'WASPADA' ? 'chip-waspada' : 'chip-aman');
 
-            // Build YOLO badge jika ada data YOLO
             $yoloBadge = '';
-            if ($fd->deteksi_yolo && $fd->confidence_yolo !== null) {
+            if ($fd->deteksi_yolo) {
                 $confidence = round($fd->confidence_yolo * 100);
-                $confidenceColor = $confidence >= 70 ? '#dc2626' : '#d97706';
-                $yoloBadge = '<span class="yolo-badge" style="position:absolute; top:4px; right:4px; background:' 
-                           . $confidenceColor . '; color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; z-index:5;">'
-                           . '🎯 ' . htmlspecialchars($fd->deteksi_yolo) . ' (' . $confidence . '%)'
-                           . '</span>';
+                $yoloBadge = '<span class="yolo-badge" style="position:absolute; top:4px; right:4px; background:' . ($confidence > 70 ? '#dc2626' : '#d97706') . '; color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; z-index:5;">🎯 ' . $fd->deteksi_yolo . ' (' . $confidence . '%)</span>';
             }
 
-            // Build foto item HTML
-            $html .= '<a href="' . asset('storage/' . $fd->image) . '" target="_blank" '
-                   . 'class="foto-item" title="' . $fd->created_at->format('d M Y H:i') . '">'
-                   . '<img src="' . asset('storage/' . $fd->image) . '" alt="Foto tanaman">'
-                   . $yoloBadge
-                   . '<span class="foto-badge ' . $badgeClass . '">' . $statusR . '</span>'
-                   . '</a>';
+            $html .= '<a href="' . asset('storage/' . $fd->image) . '" target="_blank" class="foto-item" title="' . $fd->created_at->format('d M Y H:i') . '">
+                <img src="' . asset('storage/' . $fd->image) . '" alt="Foto tanaman">
+                ' . $yoloBadge . '
+                <span class="foto-badge ' . $badgeClass . '">' . $statusR . '</span>
+            </a>';
         }
-        
         return $html . '</div>';
     }
 
-    // ================== POST /api/sensor - MAIN ENDPOINT ==================
+    // ================== ENDPOINT: POST /api/sensor ==================
     public function store(Request $request)
     {
-        /**
-         * Main API endpoint untuk menerima data dari ESP32-CAM
-         * 
-         * Flow:
-         * 1. Validasi token
-         * 2. Validasi input data
-         * 3. Simpan foto ke storage
-         * 4. Hitung Fuzzy Sugeno
-         * 5. Hitung Hybrid Status (70% YOLO + 30% Fuzzy)
-         * 6. Simpan ke cache (TTL 7 menit)
-         * 7. Simpan ke database
-         * 8. Buat notifikasi jika diperlukan
-         * 9. Return API response
-         */
-        
-        // STEP 1: Validate API token
         $token = $request->header('X-API-TOKEN') ?? $request->input('api_token');
         if ($token !== env('IOT_API_TOKEN', 'smartfarm-secret-token')) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        // STEP 2: Validate input
         $request->validate([
             'suhu_udara'       => 'required|numeric|between:0,60',
             'kelembapan_udara' => 'required|numeric|between:0,100',
@@ -379,57 +297,50 @@ class SensorController extends Controller
             'confidence_yolo'  => 'nullable|numeric|between:0,1',
         ]);
 
-        // STEP 3: Store image
         $path = null;
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('kamera', 'public');
         }
 
-        // STEP 4: Calculate Fuzzy Sugeno (tetap sama, tidak berubah)
         $nilaiFuzzy = $this->fuzzySugeno(
             $request->suhu_udara,
             $request->kelembapan_udara,
             $request->kelembapan_tanah
         );
 
-        // STEP 5: Calculate Hybrid Status (70% YOLO + 30% Fuzzy)
         [$status] = $this->getHybridStatus(
             $request->deteksi_yolo,
             $request->confidence_yolo,
             $nilaiFuzzy
         );
 
-        // STEP 6: Store in Cache (TTL 7 minutes untuk real-time display)
         Cache::put('iot_live_data', [
             'suhu'             => $request->suhu_udara,
             'kelembapan_udara' => $request->kelembapan_udara,
             'kelembapan_tanah' => $request->kelembapan_tanah,
             'nilai_fuzzy'      => round($nilaiFuzzy, 4),
-            'deteksi'          => $status,  // Hybrid status
+            'deteksi'          => $status,
             'deteksi_yolo'     => $request->deteksi_yolo,
             'confidence_yolo'  => $request->confidence_yolo,
             'image'            => $path ? asset('storage/' . $path) : null,
             'updated_at'       => now()->toIso8601String(),
         ], now()->addMinutes(7));
 
-        // STEP 7: Store in Database (untuk history & audit trail)
         $sensor = SensorReading::create([
             'suhu'             => $request->suhu_udara,
             'kelembapan_udara' => $request->kelembapan_udara,
             'kelembapan_tanah' => $request->kelembapan_tanah,
             'nilai_fuzzy'      => $nilaiFuzzy,
             'image'            => $path,
-            'deteksi'          => $status,  // Hybrid status
+            'deteksi'          => $status,
             'deteksi_yolo'     => $request->deteksi_yolo,
             'confidence_yolo'  => $request->confidence_yolo,
         ]);
 
-        // STEP 8: Create notification if needed
         if (in_array($status, ['HAMA', 'WASPADA'])) {
             $this->createNotification($status, $nilaiFuzzy, $sensor);
         }
 
-        // STEP 9: Return API response
         return response()->json([
             'message'            => 'Data diproses',
             'status'             => $status,
@@ -438,27 +349,53 @@ class SensorController extends Controller
             'confidence_yolo'    => $request->confidence_yolo,
             'stored_in_cache'    => true,
             'stored_in_database' => true,
-            'timestamp'          => now()->toIso8601String(),
         ], 201);
     }
 
-    // ================== FUZZY SUGENO (UNCHANGED - Already Correct) ==================
+    // ================== MANUAL ==================
+    public function manual()
+    {
+        if (Cache::has('iot_live_data')) {
+            $cache = Cache::get('iot_live_data');
+            $suhu  = $cache['suhu'] ?? 0;
+            $udara = $cache['kelembapan_udara'] ?? 0;
+            $tanah = $cache['kelembapan_tanah'] ?? 0;
+        } else {
+            $latest = SensorReading::latest()->first();
+            if ($latest) {
+                $suhu  = $latest->suhu;
+                $udara = $latest->kelembapan_udara;
+                $tanah = $latest->kelembapan_tanah;
+            } else {
+                return redirect()->route('dashboard')
+                    ->with('error', '❌ Belum ada data sensor. Tunggu kiriman data dari IoT atau gunakan mode simulasi.');
+            }
+        }
+
+        $nilaiFuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);
+        [$status] = $this->getStatus($nilaiFuzzy);
+
+        $sensor = SensorReading::create([
+            'suhu'             => $suhu,
+            'kelembapan_udara' => $udara,
+            'kelembapan_tanah' => $tanah,
+            'nilai_fuzzy'      => $nilaiFuzzy,
+            'deteksi'          => $status,
+        ]);
+
+        if (in_array($status, ['HAMA', 'WASPADA'])) {
+            $this->createNotification($status, $nilaiFuzzy, $sensor);
+        }
+
+        return redirect()->route('dashboard')
+            ->with('success', '✅ Data real-time berhasil disimpan ke database!');
+    }
+
+    // ==================================================================================
+    // FUZZY SUGENO
+    // ==================================================================================
     private function fuzzySugeno(float $suhu, float $udara, float $tanah): float
     {
-        /**
-         * Implementasi Fuzzy Sugeno untuk prediksi hama jagung
-         * 
-         * Input: Suhu, Kelembapan Udara, Kelembapan Tanah
-         * Output: Nilai 0.00-1.00 (tingkat risiko hama)
-         * 
-         * Proses:
-         * 1. Fuzzifikasi (membership functions)
-         * 2. Inferensi (27 rules)
-         * 3. Defuzzifikasi (weighted average)
-         * 
-         * Bobot Fuzzy dalam Hybrid Decision: 30% (70% dari YOLO)
-         */
-
         $sAman    = ThresholdSetting::getValue('suhu_aman',    22);
         $sWaspada = ThresholdSetting::getValue('suhu_waspada', 28);
         $sHama    = ThresholdSetting::getValue('suhu_hama',    32);
@@ -471,7 +408,6 @@ class SensorController extends Controller
         $tWaspada = ThresholdSetting::getValue('tanah_waspada', 68);
         $tHama    = ThresholdSetting::getValue('tanah_hama',    80);
 
-        // TAHAP 1: FUZZIFIKASI (Membership Functions)
         $dingin = max(0, min(1, ($sAman    - $suhu) / self::T_SUHU));
         $panas  = max(0, min(1, ($suhu  - $sWaspada) / max(0.01, $sHama - $sWaspada)));
         $hangat = max(0, min(1, 1 - $dingin - $panas));
@@ -484,38 +420,36 @@ class SensorController extends Controller
         $lembap_t = max(0, min(1, ($tanah - $tWaspada) / max(0.01, $tHama - $tWaspada)));
         $normal_t = max(0, min(1, 1 - $kering_t - $lembap_t));
 
-        // TAHAP 2: INFERENSI (27 Rules dengan firing strength)
         $rules = [
-            [min($panas,  $lembap_u, $lembap_t), 1.00],  // Rule 1
-            [min($panas,  $lembap_u, $normal_t), 0.85],  // Rule 2
-            [min($panas,  $lembap_u, $kering_t), 0.75],  // Rule 3
-            [min($panas,  $normal_u, $lembap_t), 0.70],  // Rule 4
-            [min($panas,  $normal_u, $normal_t), 0.55],  // Rule 5
-            [min($panas,  $normal_u, $kering_t), 0.45],  // Rule 6
-            [min($panas,  $kering_u, $lembap_t), 0.50],  // Rule 7
-            [min($panas,  $kering_u, $normal_t), 0.40],  // Rule 8
-            [min($panas,  $kering_u, $kering_t), 0.30],  // Rule 9
-            [min($hangat, $lembap_u, $lembap_t), 0.80],  // Rule 10
-            [min($hangat, $lembap_u, $normal_t), 0.65],  // Rule 11
-            [min($hangat, $lembap_u, $kering_t), 0.55],  // Rule 12
-            [min($hangat, $normal_u, $lembap_t), 0.50],  // Rule 13
-            [min($hangat, $normal_u, $normal_t), 0.40],  // Rule 14
-            [min($hangat, $normal_u, $kering_t), 0.30],  // Rule 15
-            [min($hangat, $kering_u, $lembap_t), 0.35],  // Rule 16
-            [min($hangat, $kering_u, $normal_t), 0.25],  // Rule 17
-            [min($hangat, $kering_u, $kering_t), 0.20],  // Rule 18
-            [min($dingin, $lembap_u, $lembap_t), 0.45],  // Rule 19
-            [min($dingin, $lembap_u, $normal_t), 0.35],  // Rule 20
-            [min($dingin, $lembap_u, $kering_t), 0.25],  // Rule 21
-            [min($dingin, $normal_u, $lembap_t), 0.30],  // Rule 22
-            [min($dingin, $normal_u, $normal_t), 0.20],  // Rule 23
-            [min($dingin, $normal_u, $kering_t), 0.15],  // Rule 24
-            [min($dingin, $kering_u, $lembap_t), 0.20],  // Rule 25
-            [min($dingin, $kering_u, $normal_t), 0.15],  // Rule 26
-            [min($dingin, $kering_u, $kering_t), 0.10],  // Rule 27
+            [min($panas,  $lembap_u, $lembap_t), 1.00],
+            [min($panas,  $lembap_u, $normal_t), 0.85],
+            [min($panas,  $lembap_u, $kering_t), 0.75],
+            [min($panas,  $normal_u, $lembap_t), 0.70],
+            [min($panas,  $normal_u, $normal_t), 0.55],
+            [min($panas,  $normal_u, $kering_t), 0.45],
+            [min($panas,  $kering_u, $lembap_t), 0.50],
+            [min($panas,  $kering_u, $normal_t), 0.40],
+            [min($panas,  $kering_u, $kering_t), 0.30],
+            [min($hangat, $lembap_u, $lembap_t), 0.80],
+            [min($hangat, $lembap_u, $normal_t), 0.65],
+            [min($hangat, $lembap_u, $kering_t), 0.55],
+            [min($hangat, $normal_u, $lembap_t), 0.50],
+            [min($hangat, $normal_u, $normal_t), 0.40],
+            [min($hangat, $normal_u, $kering_t), 0.30],
+            [min($hangat, $kering_u, $lembap_t), 0.35],
+            [min($hangat, $kering_u, $normal_t), 0.25],
+            [min($hangat, $kering_u, $kering_t), 0.20],
+            [min($dingin, $lembap_u, $lembap_t), 0.45],
+            [min($dingin, $lembap_u, $normal_t), 0.35],
+            [min($dingin, $lembap_u, $kering_t), 0.25],
+            [min($dingin, $normal_u, $lembap_t), 0.30],
+            [min($dingin, $normal_u, $normal_t), 0.20],
+            [min($dingin, $normal_u, $kering_t), 0.15],
+            [min($dingin, $kering_u, $lembap_t), 0.20],
+            [min($dingin, $kering_u, $normal_t), 0.15],
+            [min($dingin, $kering_u, $kering_t), 0.10],
         ];
 
-        // TAHAP 3: DEFUZZIFIKASI (Weighted Average Sugeno)
         $num = $den = 0;
         foreach ($rules as [$r, $z]) {
             $num += $r * $z;
@@ -530,17 +464,8 @@ class SensorController extends Controller
         return $num / $den;
     }
 
-    // ================== STATUS DECISION (UNCHANGED - Already Correct) ==================
     private function getStatus(float $nilai): array
     {
-        /**
-         * Convert nilai fuzzy/hybrid ke status akhir
-         * 
-         * Threshold:
-         * - nilai >= 0.70 → HAMA (serangan hama serius)
-         * - nilai >= 0.45 → WASPADA (kondisi rawan hama)
-         * - nilai < 0.45  → AMAN (kondisi aman)
-         */
         $th = ThresholdSetting::getValue('threshold_hama',    0.70);
         $tw = ThresholdSetting::getValue('threshold_waspada', 0.45);
 
@@ -606,29 +531,419 @@ class SensorController extends Controller
         ));
     }
 
-    // ================== REMAINING METHODS (NOT CHANGED) ==================
-    // Prediksi, Riwayat, dan method lain tetap sama seperti original
-    // (Tidak ditampilkan di sini karena tidak ada perubahan)
-    // Total file tetap 948 lines + improvements ~1050 lines
-
-    // ================== NOTIFICATION CREATION ==================
-    private function createNotification(string $status, float $nilai_fuzzy, SensorReading $sensor)
+    // ================== PREDIKSI ==================
+    public function prediksi()
     {
-        $message = "Status {$status} terdeteksi dengan nilai Fuzzy Sugeno: " . round($nilai_fuzzy, 4);
-        
-        // Send to all users
-        $users = User::all();
-        foreach ($users as $user) {
-            Notification::create([
-                'user_id' => $user->id,
-                'title'   => "⚠️ Alert Hama: {$status}",
-                'message' => $message,
-                'status'  => $status,
-                'read'    => false,
-            ]);
+        $statusGlobal = $this->getStatusGlobal();
+        view()->share('statusGlobal', $statusGlobal);
+
+        $isOnline    = Cache::has('iot_live_data');
+        $latest      = SensorReading::latest()->first();
+        $data        = SensorReading::latest()->take(10)->get()->reverse()->values();
+        $fuzzyValues = $data->map(fn($d) => $this->resolveFuzzyValue($d))->values()->toArray();
+        $nilai       = count($fuzzyValues) ? end($fuzzyValues) : 0;
+        [$status, $class] = $this->getStatus($nilai);
+
+        $diff = 0;
+        if (count($fuzzyValues) > 1) {
+            $totalDiff = 0;
+            for ($i = 1; $i < count($fuzzyValues); $i++) {
+                $totalDiff += ($fuzzyValues[$i] - $fuzzyValues[$i - 1]);
+            }
+            $diff = $totalDiff / (count($fuzzyValues) - 1);
         }
 
-        Log::info("Notification created for status {$status}", ['nilai_fuzzy' => $nilai_fuzzy]);
+        $prediksi = $prediksiStatus = [];
+        for ($i = 1; $i <= 3; $i++) {
+            $next = max(0, min(1, $nilai + $diff * $i));
+            $prediksi[] = round($next, 3);
+            [$ps] = $this->getStatus($next);
+            $prediksiStatus[] = $ps;
+        }
+
+        $labelsHistoris = $data->pluck('created_at')
+            ->map(fn($d) => $d->format('H:i'))->values()->toArray();
+
+        $thresholdHama    = ThresholdSetting::getValue('threshold_hama',    0.70);
+        $thresholdWaspada = ThresholdSetting::getValue('threshold_waspada', 0.45);
+
+        return view('prediksi', compact(
+            'latest', 'nilai', 'status', 'class',
+            'prediksi', 'prediksiStatus',
+            'fuzzyValues', 'labelsHistoris', 'isOnline',
+            'thresholdHama', 'thresholdWaspada'
+        ));
+    }
+
+    // ================== RIWAYAT (USER) ==================
+    public function riwayat()
+    {
+        $statusGlobal = $this->getStatusGlobal();
+        view()->share('statusGlobal', $statusGlobal);
+
+        $isOnline = Cache::has('iot_live_data');
+        $query    = SensorReading::latest();
+
+        $filter = request('filter');
+        if ($filter === '7hari')      $query->where('created_at', '>=', now()->subDays(7));
+        elseif ($filter === '1bulan') $query->where('created_at', '>=', now()->subMonth());
+        elseif ($filter === '3bulan') $query->where('created_at', '>=', now()->subMonths(3));
+
+        $filterDeteksi = request('deteksi');
+        if (in_array($filterDeteksi, ['HAMA', 'WASPADA', 'AMAN'])) {
+            $query->where('deteksi', $filterDeteksi);
+        }
+
+        $data = $query->paginate(10);
+
+        // ✅ PERBAIKAN: Gunakan status yang sudah disimpan di database (hasil hybrid)
+        $data->getCollection()->transform(function ($item) {
+            $item->nilai   = round($item->nilai_fuzzy ?? 0, 3);
+            $item->status  = $item->deteksi; // status sudah benar dari hybrid
+            return $item;
+        });
+
+        return view('riwayat', compact('data', 'isOnline'));
+    }
+
+    // ================== KAMERA ==================
+    public function kamera()
+    {
+        $statusGlobal = $this->getStatusGlobal();
+        view()->share('statusGlobal', $statusGlobal);
+
+        $isOnline = Cache::has('iot_live_data');
+
+        if ($isOnline) {
+            $cache  = Cache::get('iot_live_data');
+            $nilai  = $cache['nilai_fuzzy'];
+            [$status, $class] = $this->getStatus($nilai);
+
+            $latest = SensorReading::whereNotNull('image')->latest()->first();
+
+            if (!$latest) {
+                $latest = new \stdClass();
+                $latest->suhu             = $cache['suhu'];
+                $latest->kelembapan_udara = $cache['kelembapan_udara'];
+                $latest->kelembapan_tanah = $cache['kelembapan_tanah'];
+                $latest->image            = null;
+                $latest->created_at       = Carbon::parse($cache['updated_at'] ?? now());
+                $latest->deteksi_yolo     = $cache['deteksi_yolo'] ?? null;
+                $latest->confidence_yolo  = $cache['confidence_yolo'] ?? null;
+            }
+        } else {
+            $latest = SensorReading::whereNotNull('image')->latest()->first();
+            $nilai  = $latest ? $this->resolveFuzzyValue($latest) : 0;
+            [$status, $class] = $this->getStatus($nilai);
+        }
+
+        return view('kamera', compact('latest', 'nilai', 'status', 'class', 'isOnline'));
+    }
+
+    // ==================================================================================
+    // ADMIN
+    // ==================================================================================
+
+    public function adminDashboard()
+    {
+        $statusGlobal = $this->getStatusGlobal();
+        view()->share('statusGlobal', $statusGlobal);
+
+        $totalData = SensorReading::count();
+        $totalHama = SensorReading::where('deteksi', 'HAMA')->count();
+        $users     = User::orderBy('role')->orderBy('name')->get();
+        $settings  = ThresholdSetting::all();
+
+        return view('admin.dashboard', compact('totalData', 'totalHama', 'users', 'settings'));
+    }
+
+    public function updateThreshold(Request $request)
+    {
+        $request->validate([
+            'settings.suhu_aman'     => 'required|numeric',
+            'settings.suhu_waspada'  => 'required|numeric',
+            'settings.suhu_hama'     => 'required|numeric',
+            'settings.udara_aman'    => 'required|numeric|between:0,100',
+            'settings.udara_waspada' => 'required|numeric|between:0,100',
+            'settings.udara_hama'    => 'required|numeric|between:0,100',
+            'settings.tanah_aman'    => 'required|numeric|between:0,100',
+            'settings.tanah_waspada' => 'required|numeric|between:0,100',
+            'settings.tanah_hama'    => 'required|numeric|between:0,100',
+        ]);
+
+        $s = $request->input('settings');
+
+        $params = [
+            'Suhu Udara'       => ['suhu_aman',  'suhu_waspada',  'suhu_hama'],
+            'Kelembapan Udara' => ['udara_aman', 'udara_waspada', 'udara_hama'],
+            'Kelembapan Tanah' => ['tanah_aman', 'tanah_waspada', 'tanah_hama'],
+        ];
+
+        foreach ($params as $label => [$kAman, $kWaspada, $kHama]) {
+            $vAman    = (float) $s[$kAman];
+            $vWaspada = (float) $s[$kWaspada];
+            $vHama    = (float) $s[$kHama];
+
+            if ($vAman >= $vWaspada) {
+                return back()->withInput()
+                    ->with('error', "❌ {$label}: Batas AMAN harus lebih kecil dari batas WASPADA.");
+            }
+            if ($vWaspada >= $vHama) {
+                return back()->withInput()
+                    ->with('error', "❌ {$label}: Batas WASPADA harus lebih kecil dari batas HAMA.");
+            }
+        }
+
+        foreach ($s as $key => $value) {
+            ThresholdSetting::where('key', $key)->update(['value' => (float) $value]);
+        }
+
+        ThresholdSetting::clearCache();
+
+        return redirect()->route('admin.dashboard')
+            ->with('success', '✅ Pengaturan kondisi ideal berhasil diperbarui.');
+    }
+
+    public function resetThreshold()
+    {
+        $defaults = [
+            'suhu_aman'     => 22, 'suhu_waspada'  => 28, 'suhu_hama'     => 32,
+            'udara_aman'    => 60, 'udara_waspada' => 75, 'udara_hama'    => 85,
+            'tanah_aman'    => 55, 'tanah_waspada' => 68, 'tanah_hama'    => 80,
+        ];
+
+        foreach ($defaults as $key => $value) {
+            ThresholdSetting::where('key', $key)->update(['value' => $value]);
+        }
+
+        ThresholdSetting::clearCache();
+
+        return redirect()->route('admin.dashboard')
+            ->with('success', '🔄 Pengaturan dikembalikan ke nilai default penelitian.');
+    }
+
+    public function storeUser(Request $request)
+    {
+        $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|max:255|unique:users,email',
+            'password' => 'required|string|min:8|confirmed',
+            'role'     => 'required|in:user,admin',
+        ]);
+
+        User::create([
+            'name'     => $request->name,
+            'email'    => $request->email,
+            'password' => $request->password,
+            'role'     => $request->role,
+        ]);
+
+        return redirect()->route('admin.dashboard')
+            ->with('success', '✅ Pengguna baru berhasil ditambahkan.');
+    }
+
+    public function deleteUser(User $user)
+    {
+        if ($user->id === Auth::id()) {
+            return redirect()->route('admin.dashboard')
+                ->with('error', 'Tidak dapat menghapus akun sendiri.');
+        }
+
+        $user->delete();
+
+        return redirect()->route('admin.dashboard')
+            ->with('success', '🗑️ Pengguna berhasil dihapus.');
+    }
+
+    public function debugFuzzy(Request $request)
+    {
+        $suhu  = (float) ($request->input('suhu',  28));
+        $udara = (float) ($request->input('udara', 70));
+        $tanah = (float) ($request->input('tanah', 60));
+
+        $sAman    = ThresholdSetting::getValue('suhu_aman',    22);
+        $sWaspada = ThresholdSetting::getValue('suhu_waspada', 28);
+        $sHama    = ThresholdSetting::getValue('suhu_hama',    32);
+        $uAman    = ThresholdSetting::getValue('udara_aman',    60);
+        $uWaspada = ThresholdSetting::getValue('udara_waspada', 75);
+        $uHama    = ThresholdSetting::getValue('udara_hama',    85);
+        $tAman    = ThresholdSetting::getValue('tanah_aman',    55);
+        $tWaspada = ThresholdSetting::getValue('tanah_waspada', 68);
+        $tHama    = ThresholdSetting::getValue('tanah_hama',    80);
+
+        $dingin   = max(0, min(1, ($sAman    - $suhu)  / self::T_SUHU));
+        $panas    = max(0, min(1, ($suhu  - $sWaspada) / max(0.01, $sHama - $sWaspada)));
+        $hangat   = max(0, min(1, 1 - $dingin - $panas));
+
+        $kering_u = max(0, min(1, ($uAman    - $udara) / self::T_LEMBAP));
+        $lembap_u = max(0, min(1, ($udara - $uWaspada) / max(0.01, $uHama - $uWaspada)));
+        $normal_u = max(0, min(1, 1 - $kering_u - $lembap_u));
+
+        $kering_t = max(0, min(1, ($tAman    - $tanah) / self::T_LEMBAP));
+        $lembap_t = max(0, min(1, ($tanah - $tWaspada) / max(0.01, $tHama - $tWaspada)));
+        $normal_t = max(0, min(1, 1 - $kering_t - $lembap_t));
+
+        $rulesDef = [
+            ['label'=>'panas+lembap_u+lembap_t', 'alpha'=>min($panas,$lembap_u,$lembap_t), 'z'=>1.00],
+            ['label'=>'panas+lembap_u+normal_t', 'alpha'=>min($panas,$lembap_u,$normal_t), 'z'=>0.85],
+            ['label'=>'panas+lembap_u+kering_t', 'alpha'=>min($panas,$lembap_u,$kering_t), 'z'=>0.75],
+            ['label'=>'panas+normal_u+lembap_t', 'alpha'=>min($panas,$normal_u,$lembap_t), 'z'=>0.70],
+            ['label'=>'panas+normal_u+normal_t', 'alpha'=>min($panas,$normal_u,$normal_t), 'z'=>0.55],
+            ['label'=>'panas+normal_u+kering_t', 'alpha'=>min($panas,$normal_u,$kering_t), 'z'=>0.45],
+            ['label'=>'panas+kering_u+lembap_t', 'alpha'=>min($panas,$kering_u,$lembap_t), 'z'=>0.50],
+            ['label'=>'panas+kering_u+normal_t', 'alpha'=>min($panas,$kering_u,$normal_t), 'z'=>0.40],
+            ['label'=>'panas+kering_u+kering_t', 'alpha'=>min($panas,$kering_u,$kering_t), 'z'=>0.30],
+            ['label'=>'hangat+lembap_u+lembap_t','alpha'=>min($hangat,$lembap_u,$lembap_t),'z'=>0.80],
+            ['label'=>'hangat+lembap_u+normal_t','alpha'=>min($hangat,$lembap_u,$normal_t),'z'=>0.65],
+            ['label'=>'hangat+lembap_u+kering_t','alpha'=>min($hangat,$lembap_u,$kering_t),'z'=>0.55],
+            ['label'=>'hangat+normal_u+lembap_t','alpha'=>min($hangat,$normal_u,$lembap_t),'z'=>0.50],
+            ['label'=>'hangat+normal_u+normal_t','alpha'=>min($hangat,$normal_u,$normal_t),'z'=>0.40],
+            ['label'=>'hangat+normal_u+kering_t','alpha'=>min($hangat,$normal_u,$kering_t),'z'=>0.30],
+            ['label'=>'hangat+kering_u+lembap_t','alpha'=>min($hangat,$kering_u,$lembap_t),'z'=>0.35],
+            ['label'=>'hangat+kering_u+normal_t','alpha'=>min($hangat,$kering_u,$normal_t),'z'=>0.25],
+            ['label'=>'hangat+kering_u+kering_t','alpha'=>min($hangat,$kering_u,$kering_t),'z'=>0.20],
+            ['label'=>'dingin+lembap_u+lembap_t','alpha'=>min($dingin,$lembap_u,$lembap_t),'z'=>0.45],
+            ['label'=>'dingin+lembap_u+normal_t','alpha'=>min($dingin,$lembap_u,$normal_t),'z'=>0.35],
+            ['label'=>'dingin+lembap_u+kering_t','alpha'=>min($dingin,$lembap_u,$kering_t),'z'=>0.25],
+            ['label'=>'dingin+normal_u+lembap_t','alpha'=>min($dingin,$normal_u,$lembap_t),'z'=>0.30],
+            ['label'=>'dingin+normal_u+normal_t','alpha'=>min($dingin,$normal_u,$normal_t),'z'=>0.20],
+            ['label'=>'dingin+normal_u+kering_t','alpha'=>min($dingin,$normal_u,$kering_t),'z'=>0.15],
+            ['label'=>'dingin+kering_u+lembap_t','alpha'=>min($dingin,$kering_u,$lembap_t),'z'=>0.20],
+            ['label'=>'dingin+kering_u+normal_t','alpha'=>min($dingin,$kering_u,$normal_t),'z'=>0.15],
+            ['label'=>'dingin+kering_u+kering_t','alpha'=>min($dingin,$kering_u,$kering_t),'z'=>0.10],
+        ];
+
+        $num = $den = 0;
+        $activeRules = [];
+        foreach ($rulesDef as $rule) {
+            $num += $rule['alpha'] * $rule['z'];
+            $den += $rule['alpha'];
+            if ($rule['alpha'] > 0) {
+                $activeRules[] = [
+                    'rule'  => $rule['label'],
+                    'alpha' => round($rule['alpha'], 4),
+                    'z'     => $rule['z'],
+                    'kontribusi' => round($rule['alpha'] * $rule['z'], 4),
+                ];
+            }
+        }
+
+        $nilaiFuzzy = $den > 0 ? $num / $den : 0;
+        [$status] = $this->getStatus($nilaiFuzzy);
+
+        return response()->json([
+            'input' => [
+                'suhu'  => $suhu,
+                'udara' => $udara,
+                'tanah' => $tanah,
+            ],
+            'thresholds' => [
+                'suhu_aman'       => $sAman,    'suhu_waspada'  => $sWaspada, 'suhu_hama'  => $sHama,
+                'udara_aman'      => $uAman,    'udara_waspada' => $uWaspada, 'udara_hama' => $uHama,
+                'tanah_aman'      => $tAman,    'tanah_waspada' => $tWaspada, 'tanah_hama' => $tHama,
+                'threshold_hama'    => ThresholdSetting::getValue('threshold_hama',    0.70),
+                'threshold_waspada' => ThresholdSetting::getValue('threshold_waspada', 0.45),
+            ],
+            'membership' => [
+                'suhu'  => ['dingin'=>round($dingin,4), 'hangat'=>round($hangat,4), 'panas'=>round($panas,4)],
+                'udara' => ['kering'=>round($kering_u,4), 'normal'=>round($normal_u,4), 'lembap'=>round($lembap_u,4)],
+                'tanah' => ['kering'=>round($kering_t,4), 'normal'=>round($normal_t,4), 'lembap'=>round($lembap_t,4)],
+            ],
+            'rules' => [
+                'total'       => count($rulesDef),
+                'aktif'       => count($activeRules),
+                'detail_aktif'=> $activeRules,
+                'numerator'   => round($num, 6),
+                'denominator' => round($den, 6),
+            ],
+            'output' => [
+                'nilai_fuzzy' => round($nilaiFuzzy, 4),
+                'status'      => $status,
+            ],
+        ], 200, [], JSON_PRETTY_PRINT);
+    }
+
+    // ================== ADMIN: RIWAYAT DATA ==================
+    public function adminRiwayat()
+    {
+        $statusGlobal = $this->getStatusGlobal();
+        view()->share('statusGlobal', $statusGlobal);
+
+        $query = SensorReading::latest();
+
+        $filter = request('filter');
+        if ($filter === '7hari')      $query->where('created_at', '>=', now()->subDays(7));
+        elseif ($filter === '1bulan') $query->where('created_at', '>=', now()->subMonth());
+        elseif ($filter === '3bulan') $query->where('created_at', '>=', now()->subMonths(3));
+
+        $filterDeteksi = request('deteksi');
+        if (in_array($filterDeteksi, ['HAMA', 'WASPADA', 'AMAN'])) {
+            $query->where('deteksi', $filterDeteksi);
+        }
+
+        $data = $query->paginate(15);
+
+        $data->getCollection()->transform(function ($item) {
+            $nilai = $this->resolveFuzzyValue($item);
+            [$status] = $this->getStatus($nilai);
+            $item->nilai = round($nilai, 3);
+            $item->status = $status;
+            return $item;
+        });
+
+        return view('admin.riwayat', compact('data'));
+    }
+
+    // ================== ADMIN: HAPUS DATA RIWAYAT ==================
+    public function adminDestroyRiwayat($id)
+    {
+        $id = (int) $id;
+        Log::info('=== HAPUS DATA ID: ' . $id . ' ===');
+
+        try {
+            $data = SensorReading::findOrFail($id);
+
+            if ($data->image && Storage::disk('public')->exists($data->image)) {
+                Storage::disk('public')->delete($data->image);
+            }
+
+            $data->delete();
+
+            return redirect()->route('admin.riwayat')
+                ->with('success', '🗑️ Data riwayat berhasil dihapus.');
+        } catch (\Exception $e) {
+            Log::error('Gagal hapus data ID ' . $id . ': ' . $e->getMessage());
+            return redirect()->route('admin.riwayat')
+                ->with('error', '❌ Gagal menghapus data: ' . $e->getMessage());
+        }
+    }
+
+    // ================== ADMIN: HAPUS SEMUA DATA RIWAYAT ==================
+    public function adminDestroyAllRiwayat()
+    {
+        Log::info('=== HAPUS SEMUA DATA ===');
+
+        try {
+            $items = SensorReading::whereNotNull('image')->get();
+
+            foreach ($items as $item) {
+                if ($item->image && Storage::disk('public')->exists($item->image)) {
+                    Storage::disk('public')->delete($item->image);
+                }
+            }
+
+            SensorReading::query()->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Semua data berhasil dihapus.'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Gagal hapus semua data: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 }
-?>
