@@ -16,14 +16,14 @@
     </div>
 </div>
 
-{{-- ── BANNER OFFLINE (tersembunyi saat online) ── --}}
+{{-- ── BANNER OFFLINE ── --}}
 <div id="offline-banner" style="display:none; background:#fef2f2; border:1px solid #fca5a5;
     border-radius:10px; padding:12px 18px; margin-bottom:16px; color:#dc2626;
     font-size:13px; font-weight:600; display:flex; align-items:center; gap:10px;">
     ⚠️ Perangkat IoT terputus — menampilkan data historis terakhir. Card sensor akan kosong hingga alat kembali online.
 </div>
 
-{{-- ── 2 KOTAK STATUS (KESEHATAN TANAH & DETEKSI HAMA) ── --}}
+{{-- ── 2 KOTAK STATUS (KESEHATAN TANAH & STATUS PREDIKSI HAMA) ── --}}
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
     
     {{-- Kotak 1: Kesehatan Tanah --}}
@@ -42,44 +42,57 @@
         </div>
     </div>
 
-    {{-- Kotak 2: Deteksi Hama --}}
-    <div class="panel" style="border-left:4px solid {{ $isOnline ? ($status=='HAMA' ? '#dc2626' : ($status=='WASPADA' ? '#f59e0b' : '#22c55e')) : '#94a3b8' }};">
+    {{-- Kotak 2: Status Prediksi Hama (dipindahkan dari grid sensor) --}}
+    <div id="live-status-card" class="panel" style="border-left:4px solid 
+        @if(!$isOnline) #94a3b8
+        @elseif($status=='HAMA') #dc2626
+        @elseif($status=='WASPADA') #f59e0b
+        @else #22c55e
+        @endif;">
         <div class="panel-header">
-            <div class="panel-title">🐛 Deteksi Hama</div>
+            <div class="panel-title">🐛 Status Prediksi Hama</div>
             <span style="font-size:12px; color:#64748b;">Nilai Fuzzy: {{ $isOnline ? number_format($nilai, 3) : '--' }}</span>
         </div>
-        <div class="panel-body">
-            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                <span style="font-size:24px; font-weight:700; color:{{ $isOnline ? ($status=='HAMA' ? '#dc2626' : ($status=='WASPADA' ? '#f59e0b' : '#22c55e')) : '#94a3b8' }};">
-                    @if(!$isOnline)
-                        📡 Offline
-                    @elseif($status=='HAMA')
-                        🚨 {{ $status }}
-                    @elseif($status=='WASPADA')
-                        ⚠️ {{ $status }}
-                    @else
-                        ✅ {{ $status }}
-                    @endif
-                </span>
-                <span style="font-size:13px; color:#475569;">
-                    @if($isOnline && $status == 'HAMA')
-                        YOLO + Fuzzy mengonfirmasi hama!
-                    @elseif($isOnline && $status == 'WASPADA')
-                        Risiko tinggi, pantau terus.
-                    @elseif($isOnline && $status == 'AMAN')
-                        Kondisi aman.
-                    @else
-                        Menunggu data...
-                    @endif
-                </span>
+        <div class="panel-body" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <span class="sc-icon" id="live-status-icon" style="font-size:28px;">
+                @if(!$isOnline) 📡
+                @elseif($status=='HAMA') 🚨
+                @elseif($status=='WASPADA') ⚠️
+                @else ✅
+                @endif
+            </span>
+            <div>
+                <div style="font-size:24px; font-weight:700; color:{{ $isOnline ? ($status=='HAMA' ? '#dc2626' : ($status=='WASPADA' ? '#f59e0b' : '#22c55e')) : '#94a3b8' }};">
+                    <span id="live-status-text">
+                        @if(!$isOnline) Offline
+                        @elseif($status=='HAMA') Terdeteksi!
+                        @elseif($status=='WASPADA') Waspada
+                        @else Aman
+                        @endif
+                    </span>
+                </div>
+                <div>
+                    <span id="live-status-badge-besar" class="status-badge-besar
+                        @if(!$isOnline) badge-offline
+                        @elseif($status=='HAMA') badge-hama
+                        @elseif($status=='WASPADA') badge-waspada
+                        @else badge-aman
+                        @endif">
+                        @if(!$isOnline)
+                            OFFLINE
+                        @else
+                            {{ $status }} | {{ number_format($nilai, 3) }}
+                        @endif
+                    </span>
+                </div>
             </div>
         </div>
     </div>
 
 </div>
 
-{{-- ── KARTU SENSOR ── --}}
-<div class="sensor-grid">
+{{-- ── KARTU SENSOR (3 CARD: SUHU, UDARA, TANAH) ── --}}
+<div class="sensor-grid" style="grid-template-columns:repeat(3,1fr);">
 
     {{-- Suhu --}}
     <div class="sensor-card suhu">
@@ -141,44 +154,6 @@
             @else
                 Menunggu data dari alat IoT...
             @endif
-        </div>
-    </div>
-
-    {{-- Status Deteksi --}}
-    <div id="live-status-card" class="sensor-card status
-        @if(!$isOnline) status-offline
-        @elseif($status=='HAMA') status-hama
-        @elseif($status=='WASPADA') status-waspada
-        @else status-aman
-        @endif">
-        <span class="sc-icon" id="live-status-icon">
-            @if(!$isOnline) 📡
-            @elseif($status=='HAMA') 🚨
-            @elseif($status=='WASPADA') ⚠️
-            @else ✅
-            @endif
-        </span>
-        <div class="sc-label">Status Deteksi Hama</div>
-        <div class="sc-value" id="live-status-text" style="font-size:22px; margin-bottom:4px;">
-            @if(!$isOnline) Offline
-            @elseif($status=='HAMA') Terdeteksi!
-            @elseif($status=='WASPADA') Waspada
-            @else Aman
-            @endif
-        </div>
-        <div>
-            <span id="live-status-badge-besar" class="status-badge-besar
-                @if(!$isOnline) badge-offline
-                @elseif($status=='HAMA') badge-hama
-                @elseif($status=='WASPADA') badge-waspada
-                @else badge-aman
-                @endif">
-                @if(!$isOnline)
-                    OFFLINE
-                @else
-                    {{ $status }} | {{ number_format($nilai, 3) }}
-                @endif
-            </span>
         </div>
     </div>
 
@@ -304,7 +279,7 @@
     </div>
 </div>
 
-{{-- ── TABEL DATA TERAKHIR (dari DB, bukan live) ── --}}
+{{-- ── TABEL DATA TERAKHIR ── --}}
 <div class="panel" style="margin-bottom:18px;">
     <div class="panel-header">
         <div class="panel-title">📋 Riwayat Data Sensor (tersimpan setiap 15 menit)</div>
@@ -357,9 +332,9 @@
     </div>
 </div>
 
-{{-- ── SCRIPT REAL-TIME (FETCH API — TANPA RELOAD HALAMAN) ── --}}
+{{-- ── SCRIPT REAL-TIME ── --}}
 <script>
-    // ── Data awal dari server (untuk inisialisasi grafik) ──────────────────────────
+    // ── Data awal dari server ──────────────────────────────────────────────────
     var labels      = @json($labels);
     var suhuData    = @json($suhu);
     var udaraData   = @json($udara);
@@ -371,7 +346,6 @@
     var chartSensorInstance;
     var chartFuzzyInstance;
 
-    // ── Animasi awal meter pointer ─────────────────────────────────────────────────
     window.addEventListener('load', function () {
         var ptr = document.getElementById('meterPtr');
         if (ptr && isOnlineInit) {
@@ -381,7 +355,6 @@
         }
     });
 
-    // ── Inisialisasi Grafik Sensor ─────────────────────────────────────────────────
     var ctxSensor = document.getElementById('chartSensor').getContext('2d');
     chartSensorInstance = new Chart(ctxSensor, {
         type: 'line',
@@ -396,7 +369,6 @@
         options: { responsive: true, maintainAspectRatio: false }
     });
 
-    // ── Inisialisasi Grafik Fuzzy ──────────────────────────────────────────────────
     var ctxFuzzy = document.getElementById('chartFuzzy').getContext('2d');
     chartFuzzyInstance = new Chart(ctxFuzzy, {
         type: 'line',
@@ -419,10 +391,8 @@
         }
     });
 
-    // ── STATE POLLING ──────────────────────────────────────────────────────────────
     var lastLiveTimestamp = null;
 
-    // ── FUNGSI UTAMA POLLING (berjalan setiap 5 detik) ────────────────────────────
     function perbaruiDashboard() {
         fetch('/live-data')
             .then(function(r) { return r.json(); })
@@ -452,6 +422,7 @@
                 if (tsIso === lastLiveTimestamp) return;
                 lastLiveTimestamp = tsIso;
 
+                // Update mini cards (suhu, udara, tanah)
                 el('live-suhu',  suhu);
                 el('live-udara', udara);
                 el('live-tanah', tanah);
@@ -475,28 +446,30 @@
                     else                  elTanahSub.innerText = 'Tanah kering — risiko rendah';
                 }
 
+                // Update card status hama yang sudah dipindah ke atas
                 var statusCard = document.getElementById('live-status-card');
                 var statusIcon = document.getElementById('live-status-icon');
                 var statusText = document.getElementById('live-status-text');
                 var statusBadge = document.getElementById('live-status-badge-besar');
 
                 if (statusHama === 'HAMA') {
-                    if (statusCard)  statusCard.className  = 'sensor-card status status-hama';
+                    if (statusCard)  statusCard.style.borderLeftColor = '#dc2626';
                     if (statusIcon)  statusIcon.innerText  = '🚨';
                     if (statusText)  statusText.innerText  = 'Terdeteksi!';
                     if (statusBadge) { statusBadge.className = 'status-badge-besar badge-hama'; statusBadge.innerText = 'HAMA | ' + nilaiFuzzy.toFixed(3); }
                 } else if (statusHama === 'WASPADA') {
-                    if (statusCard)  statusCard.className  = 'sensor-card status status-waspada';
+                    if (statusCard)  statusCard.style.borderLeftColor = '#f59e0b';
                     if (statusIcon)  statusIcon.innerText  = '⚠️';
                     if (statusText)  statusText.innerText  = 'Waspada';
                     if (statusBadge) { statusBadge.className = 'status-badge-besar badge-waspada'; statusBadge.innerText = 'WASPADA | ' + nilaiFuzzy.toFixed(3); }
                 } else {
-                    if (statusCard)  statusCard.className  = 'sensor-card status status-aman';
+                    if (statusCard)  statusCard.style.borderLeftColor = '#22c55e';
                     if (statusIcon)  statusIcon.innerText  = '✅';
                     if (statusText)  statusText.innerText  = 'Aman';
                     if (statusBadge) { statusBadge.className = 'status-badge-besar badge-aman'; statusBadge.innerText = 'AMAN | ' + nilaiFuzzy.toFixed(3); }
                 }
 
+                // Update fuzzy meter
                 var meterVal = document.getElementById('live-fuzzy-meter-val');
                 if (meterVal) {
                     meterVal.innerText    = nilaiFuzzy.toFixed(3);
@@ -505,6 +478,7 @@
                 var ptr = document.getElementById('meterPtr');
                 if (ptr) ptr.style.left = (nilaiFuzzy * 100).toFixed(1) + '%';
 
+                // Update analisis items
                 el('analisis-suhu',   suhu + ' °C');
                 el('analisis-udara',  udara + ' %');
                 el('analisis-tanah',  tanah + ' %');
@@ -516,6 +490,7 @@
                     analisisBadge.className  = 'badge-status ' + (statusHama === 'HAMA' ? 'bs-hama' : (statusHama === 'WASPADA' ? 'bs-waspada' : 'bs-aman'));
                 }
 
+                // Rekomendasi
                 var rekBox   = document.getElementById('live-rekomendasi-box');
                 var rekJudul = document.getElementById('live-rek-judul');
                 var rekIsi   = document.getElementById('live-rek-isi');
@@ -550,12 +525,13 @@
             if (e) e.innerText = 'Menunggu data dari alat IoT...';
         });
 
-        var statusCard  = document.getElementById('live-status-card');
-        var statusIcon  = document.getElementById('live-status-icon');
-        var statusText  = document.getElementById('live-status-text');
+        // Update status card (dipindah ke atas)
+        var statusCard = document.getElementById('live-status-card');
+        var statusIcon = document.getElementById('live-status-icon');
+        var statusText = document.getElementById('live-status-text');
         var statusBadge = document.getElementById('live-status-badge-besar');
 
-        if (statusCard)  statusCard.className  = 'sensor-card status status-offline';
+        if (statusCard)  statusCard.style.borderLeftColor = '#94a3b8';
         if (statusIcon)  statusIcon.innerText  = '📡';
         if (statusText)  statusText.innerText  = 'Offline';
         if (statusBadge) { statusBadge.className = 'status-badge-besar badge-offline'; statusBadge.innerText = 'OFFLINE'; }
