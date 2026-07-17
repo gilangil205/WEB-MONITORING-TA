@@ -6,9 +6,11 @@ use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-
 class NotificationController extends Controller
 {
+    /**
+     * Constructor - Apply auth middleware
+     */
     public function __construct()
     {
         $this->middleware('auth');
@@ -16,6 +18,9 @@ class NotificationController extends Controller
 
     /**
      * Ambil daftar notifikasi user yang sedang login
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function index(Request $request)
     {
@@ -52,8 +57,11 @@ class NotificationController extends Controller
 
     /**
      * Tandai satu notifikasi sebagai sudah dibaca
+     *
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function markAsRead($id)
+    public function markAsRead(int $id)
     {
         $notification = Notification::where('user_id', Auth::id())
             ->findOrFail($id);
@@ -68,6 +76,8 @@ class NotificationController extends Controller
 
     /**
      * Tandai semua notifikasi sebagai sudah dibaca
+     *
+     * @return \Illuminate\Http\JsonResponse
      */
     public function markAllAsRead()
     {
@@ -85,9 +95,12 @@ class NotificationController extends Controller
     }
 
     /**
-     * Hapus notifikasi (opsional)
+     * Hapus notifikasi
+     *
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy($id)
+    public function destroy(int $id)
     {
         $notification = Notification::where('user_id', Auth::id())
             ->findOrFail($id);

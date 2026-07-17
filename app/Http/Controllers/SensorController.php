@@ -20,27 +20,91 @@ class SensorController extends Controller
     private const T_LEMBAP = 5;
 
     // ================== HELPER: HYBRID LOGIC (70% YOLO + 30% FUZZY) ==================
+    /**
+     * Hybrid decision logic
+     * 
+     * Flow:
+     * 1. Jika YOLO kosong atau confidence < 0.3 → fallback ke Fuzzy murni
+     * 2. Jika YOLO ada dan confidence >= 0.3 → hitung hybrid dengan interpretYoloDetection()
+     * 3. Formula: (YOLO_score × 0.7) + (Fuzzy × 0.3)
+     * 4. Return status berdasarkan hybrid value
+     */
     private function getHybridStatus(?string $deteksiYolo, ?float $confidenceYolo, float $nilaiFuzzy): array
     {
+        // FALLBACK: Jika YOLO data tidak ada atau confidence rendah
         if (empty($deteksiYolo) || $confidenceYolo === null || $confidenceYolo < 0.3) {
             return $this->getStatus($nilaiFuzzy);
         }
 
-        $isDetected = stripos($deteksiYolo, 'terdeteksi') !== false ||
-                      stripos($deteksiYolo, 'detected') !== false ||
-                      stripos($deteksiYolo, 'hama') !== false ||
-                      stripos($deteksiYolo, 'tikus') !== false;
+        // Interpret YOLO detection dengan negation handling
+        $yoloScore = $this->interpretYoloDetection($deteksiYolo, $confidenceYolo);
 
-        if ($isDetected) {
-            $yoloScore = max($confidenceYolo, 0.7);
-        } else {
-            $yoloScore = 0;
-        }
-
+        // HYBRID CALCULATION: 70% YOLO + 30% Fuzzy
         $nilaiHybrid = ($yoloScore * 0.7) + ($nilaiFuzzy * 0.3);
         $nilaiHybrid = max(0, min(1, $nilaiHybrid));
 
         return $this->getStatus($nilaiHybrid);
+    }
+
+    // ================== HELPER: INTERPRET YOLO DETECTION ==================
+    /**
+     * Interpret YOLO detection string dengan negation handling
+     * 
+     * @param string $deteksiYolo - YOLO output string
+     * @param float $confidenceYolo - YOLO confidence score
+     * @return float - yolo_score (0 = no pest, >= 0.7 = pest detected)
+     */
+    private function interpretYoloDetection(string $deteksiYolo, float $confidenceYolo): float
+    {
+        // Normalize string
+        $deteksi = strtolower(trim($deteksiYolo));
+
+        // NEGATION KEYWORDS (prioritas tinggi)
+        $negationKeywords = [
+            'tidak',        // "Tidak Ada Hama"
+            'tidak ada',    // "Tidak Ada Hama"
+            'no ',          // "No Pest", "No Detection"
+            'none',         // "None"
+            'belum',        // "Belum Ada Hama"
+            'empty',        // "Empty / Kosong"
+            'clear',        // "Clear / Bersih"
+            'aman',         // "Aman"
+            'negatif',      // "Negatif"
+            'negative'      // "Negative"
+        ];
+
+        // PEST KEYWORDS (hanya jika tidak ada negation)
+        $pestKeywords = [
+            'terdeteksi',   // "Tikus Terdeteksi"
+            'detected',     // "Pest Detected"
+            'found',        // "Pest Found"
+            'ada',          // "Ada Hama"
+            'tikus',        // "Tikus"
+            'mouse',        // "Mouse"
+            'rat',          // "Rat"
+            'serangga',     // "Serangga"
+            'insect',       // "Insect"
+            'hama'          // "Hama" (tetapi harus tidak ada negation)
+        ];
+
+        // STEP 1: Check negation
+        foreach ($negationKeywords as $neg) {
+            if (strpos($deteksi, $neg) !== false) {
+                // Negation found → NO PEST
+                return 0;
+            }
+        }
+
+        // STEP 2: Check pest keywords (only if no negation)
+        foreach ($pestKeywords as $pest) {
+            if (strpos($deteksi, $pest) !== false) {
+                // Pest keyword found → PEST DETECTED
+                return max($confidenceYolo, 0.7);
+            }
+        }
+
+        // STEP 3: Jika tidak ada keyword yang match → NO DETECTION (safe default)
+        return 0;
     }
 
     // ================== HELPER: RESOLVE NILAI FUZZY ==================
@@ -254,29 +318,45 @@ class SensorController extends Controller
         ];
     }
 
+    // ================== BUILD RIWAYAT HTML ==================
+    // ✅ FIX: Gunakan stored status (hybrid) dari database, bukan recalculate
     private function buildRiwayatHtml(Collection $fotoData): string
     {
         if ($fotoData->isEmpty()) {
             return '<div class="foto-placeholder">📷 Belum ada foto dari kamera IoT.</div>';
         }
-        $html = '<div class="foto-grid">';
-        foreach ($fotoData as $fd) {
-            $nilaiR = $this->resolveFuzzyValue($fd);
-            [$statusR] = $this->getStatus($nilaiR);
-            $badgeClass = $statusR === 'HAMA' ? 'chip-hama' : ($statusR === 'WASPADA' ? 'chip-waspada' : 'chip-aman');
 
+        $html = '<div class="foto-grid">';
+        
+        foreach ($fotoData as $fd) {
+            // ✅ FIXED: Gunakan stored status (hybrid) dari database
+            // Ini adalah sumber kebenaran untuk status
+            $statusR = $fd->deteksi;  
+            
+            // Determine badge styling berdasarkan status
+            $badgeClass = $statusR === 'HAMA' ? 'chip-hama' : 
+                         ($statusR === 'WASPADA' ? 'chip-waspada' : 'chip-aman');
+
+            // Build YOLO badge jika ada data YOLO
             $yoloBadge = '';
-            if ($fd->deteksi_yolo) {
+            if ($fd->deteksi_yolo && $fd->confidence_yolo !== null) {
                 $confidence = round($fd->confidence_yolo * 100);
-                $yoloBadge = '<span class="yolo-badge" style="position:absolute; top:4px; right:4px; background:' . ($confidence > 70 ? '#dc2626' : '#d97706') . '; color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; z-index:5;">🎯 ' . $fd->deteksi_yolo . ' (' . $confidence . '%)</span>';
+                $confidenceColor = $confidence >= 70 ? '#dc2626' : '#d97706';
+                $yoloBadge = '<span class="yolo-badge" style="position:absolute; top:4px; right:4px; background:' 
+                           . $confidenceColor . '; color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; z-index:5;">'
+                           . '🎯 ' . htmlspecialchars($fd->deteksi_yolo) . ' (' . $confidence . '%)'
+                           . '</span>';
             }
 
-            $html .= '<a href="' . asset('storage/' . $fd->image) . '" target="_blank" class="foto-item" title="' . $fd->created_at->format('d M Y H:i') . '">
-                <img src="' . asset('storage/' . $fd->image) . '" alt="Foto tanaman">
-                ' . $yoloBadge . '
-                <span class="foto-badge ' . $badgeClass . '">' . $statusR . '</span>
-            </a>';
+            // Build foto item HTML
+            $html .= '<a href="' . asset('storage/' . $fd->image) . '" target="_blank" '
+                   . 'class="foto-item" title="' . $fd->created_at->format('d M Y H:i') . '">'
+                   . '<img src="' . asset('storage/' . $fd->image) . '" alt="Foto tanaman">'
+                   . $yoloBadge
+                   . '<span class="foto-badge ' . $badgeClass . '">' . $statusR . '</span>'
+                   . '</a>';
         }
+        
         return $html . '</div>';
     }
 
@@ -308,6 +388,7 @@ class SensorController extends Controller
             $request->kelembapan_tanah
         );
 
+        // 🔥 HYBRID LOGIC: 70% YOLO + 30% Fuzzy
         [$status] = $this->getHybridStatus(
             $request->deteksi_yolo,
             $request->confidence_yolo,
@@ -392,7 +473,7 @@ class SensorController extends Controller
     }
 
     // ==================================================================================
-    // FUZZY SUGENO
+    // FUZZY SUGENO (UNCHANGED - Already Correct)
     // ==================================================================================
     private function fuzzySugeno(float $suhu, float $udara, float $tanah): float
     {
@@ -464,6 +545,7 @@ class SensorController extends Controller
         return $num / $den;
     }
 
+    // ================== STATUS DECISION ==================
     private function getStatus(float $nilai): array
     {
         $th = ThresholdSetting::getValue('threshold_hama',    0.70);
