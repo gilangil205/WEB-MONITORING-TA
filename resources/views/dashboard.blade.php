@@ -16,92 +16,69 @@
     </div>
 </div>
 
-{{-- ── BANNER OFFLINE ── --}}
+{{-- ── BANNER OFFLINE (tersembunyi saat online) ── --}}
 <div id="offline-banner" style="display:none; background:#fef2f2; border:1px solid #fca5a5;
     border-radius:10px; padding:12px 18px; margin-bottom:16px; color:#dc2626;
     font-size:13px; font-weight:600; display:flex; align-items:center; gap:10px;">
     ⚠️ Perangkat IoT terputus — menampilkan data historis terakhir. Card sensor akan kosong hingga alat kembali online.
 </div>
 
-{{-- ── 1 KOTAK STATUS TANAMAN (GABUNGAN) ── --}}
-<div style="display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:20px;">
-    <div class="panel" style="border-left:4px solid 
-        @if(!$isOnline) #94a3b8
-        @elseif($status=='HAMA' || $waterClass == 'status-critical') #dc2626
-        @elseif($status=='WASPADA' || $waterClass == 'status-warning') #f59e0b
-        @else #22c55e
-        @endif;">
+{{-- ── 2 KOTAK STATUS (KESEHATAN TANAH & DETEKSI HAMA) ── --}}
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+    
+    {{-- Kotak 1: Kesehatan Tanah --}}
+    <div class="panel" style="border-left:4px solid {{ $waterClass == 'status-critical' ? '#dc2626' : ($waterClass == 'status-warning' ? '#f59e0b' : '#22c55e') }};">
         <div class="panel-header">
-            <div class="panel-title">🌱 Status Tanaman</div>
-            <span style="font-size:12px; color:#64748b;">
-                @if($isOnline)
-                    Update: {{ now()->format('H:i') }}
-                @else
-                    📡 Offline
-                @endif
-            </span>
+            <div class="panel-title">🌱 Kesehatan Tanah</div>
+            <span style="font-size:12px; color:#64748b;">Kelembapan: {{ number_format($waterTanah, 1) }}%</span>
         </div>
         <div class="panel-body">
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-
-                {{-- Kiri: Status Air --}}
-                <div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                        <span style="font-size:16px;">💧</span>
-                        <span style="font-size:13px; font-weight:600; color:#475569;">Kelembapan Tanah</span>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                        <span style="font-size:24px; font-weight:700; color:{{ $waterClass == 'status-critical' ? '#dc2626' : ($waterClass == 'status-warning' ? '#f59e0b' : '#22c55e') }};">
-                            {{ $waterStatus }}
-                        </span>
-                        <span style="font-size:14px; color:#64748b;">({{ number_format($waterTanah, 1) }}%)</span>
-                    </div>
-                    <div style="font-size:12px; color:#475569; margin-top:4px;">
-                        {{ $waterRecommendation }}
-                    </div>
-                </div>
-
-                {{-- Kanan: Status Hama --}}
-                <div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                        <span style="font-size:16px;">🐛</span>
-                        <span style="font-size:13px; font-weight:600; color:#475569;">Deteksi Hama</span>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                        <span style="font-size:24px; font-weight:700; color:{{ $isOnline ? ($status=='HAMA' ? '#dc2626' : ($status=='WASPADA' ? '#f59e0b' : '#22c55e')) : '#94a3b8' }};">
-                            @if(!$isOnline)
-                                📡 Offline
-                            @elseif($status=='HAMA')
-                                🚨 {{ $status }}
-                            @elseif($status=='WASPADA')
-                                ⚠️ {{ $status }}
-                            @else
-                                ✅ {{ $status }}
-                            @endif
-                        </span>
-                        <span style="font-size:14px; color:#64748b;">
-                            (Nilai: {{ $isOnline ? number_format($nilai, 3) : '--' }})
-                        </span>
-                    </div>
-                    <div style="font-size:12px; color:#475569; margin-top:4px;">
-                        @if(!$isOnline)
-                            Menunggu data dari perangkat...
-                        @elseif($status=='HAMA')
-                            🚨 YOLO + Fuzzy mengonfirmasi hama!
-                        @elseif($status=='WASPADA')
-                            ⚠️ Risiko tinggi, pantau terus.
-                        @else
-                            ✅ Kondisi aman.
-                        @endif
-                    </div>
-                </div>
-
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <span style="font-size:24px; font-weight:700; color:{{ $waterClass == 'status-critical' ? '#dc2626' : ($waterClass == 'status-warning' ? '#f59e0b' : '#22c55e') }};">
+                    {{ $waterStatus }}
+                </span>
+                <span style="font-size:13px; color:#475569;">{{ $waterRecommendation }}</span>
             </div>
         </div>
     </div>
+
+    {{-- Kotak 2: Deteksi Hama --}}
+    <div class="panel" style="border-left:4px solid {{ $isOnline ? ($status=='HAMA' ? '#dc2626' : ($status=='WASPADA' ? '#f59e0b' : '#22c55e')) : '#94a3b8' }};">
+        <div class="panel-header">
+            <div class="panel-title">🐛 Deteksi Hama</div>
+            <span style="font-size:12px; color:#64748b;">Nilai Fuzzy: {{ $isOnline ? number_format($nilai, 3) : '--' }}</span>
+        </div>
+        <div class="panel-body">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <span style="font-size:24px; font-weight:700; color:{{ $isOnline ? ($status=='HAMA' ? '#dc2626' : ($status=='WASPADA' ? '#f59e0b' : '#22c55e')) : '#94a3b8' }};">
+                    @if(!$isOnline)
+                        📡 Offline
+                    @elseif($status=='HAMA')
+                        🚨 {{ $status }}
+                    @elseif($status=='WASPADA')
+                        ⚠️ {{ $status }}
+                    @else
+                        ✅ {{ $status }}
+                    @endif
+                </span>
+                <span style="font-size:13px; color:#475569;">
+                    @if($isOnline && $status == 'HAMA')
+                        YOLO + Fuzzy mengonfirmasi hama!
+                    @elseif($isOnline && $status == 'WASPADA')
+                        Risiko tinggi, pantau terus.
+                    @elseif($isOnline && $status == 'AMAN')
+                        Kondisi aman.
+                    @else
+                        Menunggu data...
+                    @endif
+                </span>
+            </div>
+        </div>
+    </div>
+
 </div>
 
-{{-- ── KARTU SENSOR (4 CARD) ── --}}
+{{-- ── KARTU SENSOR ── --}}
 <div class="sensor-grid">
 
     {{-- Suhu --}}
@@ -167,7 +144,7 @@
         </div>
     </div>
 
-    {{-- Status Deteksi Hama --}}
+    {{-- Status Deteksi --}}
     <div id="live-status-card" class="sensor-card status
         @if(!$isOnline) status-offline
         @elseif($status=='HAMA') status-hama
@@ -327,7 +304,7 @@
     </div>
 </div>
 
-{{-- ── TABEL DATA TERAKHIR ── --}}
+{{-- ── TABEL DATA TERAKHIR (dari DB, bukan live) ── --}}
 <div class="panel" style="margin-bottom:18px;">
     <div class="panel-header">
         <div class="panel-title">📋 Riwayat Data Sensor (tersimpan setiap 15 menit)</div>
@@ -380,9 +357,9 @@
     </div>
 </div>
 
-{{-- ── SCRIPT REAL-TIME ── --}}
+{{-- ── SCRIPT REAL-TIME (FETCH API — TANPA RELOAD HALAMAN) ── --}}
 <script>
-    // ── Data awal dari server ──────────────────────────────────────────────────
+    // ── Data awal dari server (untuk inisialisasi grafik) ──────────────────────────
     var labels      = @json($labels);
     var suhuData    = @json($suhu);
     var udaraData   = @json($udara);
@@ -394,6 +371,7 @@
     var chartSensorInstance;
     var chartFuzzyInstance;
 
+    // ── Animasi awal meter pointer ─────────────────────────────────────────────────
     window.addEventListener('load', function () {
         var ptr = document.getElementById('meterPtr');
         if (ptr && isOnlineInit) {
@@ -403,6 +381,7 @@
         }
     });
 
+    // ── Inisialisasi Grafik Sensor ─────────────────────────────────────────────────
     var ctxSensor = document.getElementById('chartSensor').getContext('2d');
     chartSensorInstance = new Chart(ctxSensor, {
         type: 'line',
@@ -417,6 +396,7 @@
         options: { responsive: true, maintainAspectRatio: false }
     });
 
+    // ── Inisialisasi Grafik Fuzzy ──────────────────────────────────────────────────
     var ctxFuzzy = document.getElementById('chartFuzzy').getContext('2d');
     chartFuzzyInstance = new Chart(ctxFuzzy, {
         type: 'line',
@@ -439,8 +419,10 @@
         }
     });
 
+    // ── STATE POLLING ──────────────────────────────────────────────────────────────
     var lastLiveTimestamp = null;
 
+    // ── FUNGSI UTAMA POLLING (berjalan setiap 5 detik) ────────────────────────────
     function perbaruiDashboard() {
         fetch('/live-data')
             .then(function(r) { return r.json(); })
