@@ -29,22 +29,35 @@ class SensorController extends Controller
      * 3. Formula: (YOLO_score × 0.7) + (Fuzzy × 0.3)
      * 4. Return status berdasarkan hybrid value
      */
-    private function getHybridStatus(?string $deteksiYolo, ?float $confidenceYolo, float $nilaiFuzzy): array
-    {
-        // FALLBACK: Jika YOLO data tidak ada atau confidence rendah
-        if (empty($deteksiYolo) || $confidenceYolo === null || $confidenceYolo < 0.3) {
-            return $this->getStatus($nilaiFuzzy);
-        }
+ private function getHybridStatus(?string $deteksiYolo, ?float $confidenceYolo, float $nilaiFuzzy): array
+{
+    // FALLBACK: Jika YOLO tidak tersedia atau confidence rendah
+    if (empty($deteksiYolo) || $confidenceYolo === null || $confidenceYolo < 0.3) {
 
-        // Interpret YOLO detection dengan negation handling
-        $yoloScore = $this->interpretYoloDetection($deteksiYolo, $confidenceYolo);
+        [$status, $class] = $this->getStatus($nilaiFuzzy);
 
-        // HYBRID CALCULATION: 70% YOLO + 30% Fuzzy
-        $nilaiHybrid = ($yoloScore * 0.7) + ($nilaiFuzzy * 0.3);
-        $nilaiHybrid = max(0, min(1, $nilaiHybrid));
-
-        return $this->getStatus($nilaiHybrid);
+        return [
+            $status,
+            $class,
+            $nilaiFuzzy
+        ];
     }
+
+    // Interpret hasil YOLO
+    $yoloScore = $this->interpretYoloDetection($deteksiYolo, $confidenceYolo);
+
+    // Hybrid = 70% YOLO + 30% Fuzzy
+    $nilaiHybrid = ($yoloScore * 0.7) + ($nilaiFuzzy * 0.3);
+    $nilaiHybrid = max(0, min(1, $nilaiHybrid));
+
+    [$status, $class] = $this->getStatus($nilaiHybrid);
+
+    return [
+        $status,
+        $class,
+        $nilaiHybrid
+    ];
+}
 
     // ================== HELPER: INTERPRET YOLO DETECTION ==================
     /**
@@ -389,7 +402,7 @@ class SensorController extends Controller
         );
 
         // 🔥 HYBRID LOGIC: 70% YOLO + 30% Fuzzy
-        [$status] = $this->getHybridStatus(
+      [$status, $class, $nilaiHybrid] = $this->getHybridStatus(
             $request->deteksi_yolo,
             $request->confidence_yolo,
             $nilaiFuzzy
@@ -400,6 +413,7 @@ class SensorController extends Controller
             'kelembapan_udara' => $request->kelembapan_udara,
             'kelembapan_tanah' => $request->kelembapan_tanah,
             'nilai_fuzzy'      => round($nilaiFuzzy, 4),
+            'nilai_hybrid'     => round($nilaiHybrid, 4),
             'deteksi'          => $status,
             'deteksi_yolo'     => $request->deteksi_yolo,
             'confidence_yolo'  => $request->confidence_yolo,
@@ -412,6 +426,7 @@ class SensorController extends Controller
             'kelembapan_udara' => $request->kelembapan_udara,
             'kelembapan_tanah' => $request->kelembapan_tanah,
             'nilai_fuzzy'      => $nilaiFuzzy,
+            'nilai_hybrid'     => $nilaiHybrid,
             'image'            => $path,
             'deteksi'          => $status,
             'deteksi_yolo'     => $request->deteksi_yolo,
@@ -426,6 +441,7 @@ class SensorController extends Controller
             'message'            => 'Data diproses',
             'status'             => $status,
             'nilai_fuzzy'        => round($nilaiFuzzy, 4),
+            'nilai_hybrid'       => round($nilaiHybrid, 4), 
             'deteksi_yolo'       => $request->deteksi_yolo,
             'confidence_yolo'    => $request->confidence_yolo,
             'stored_in_cache'    => true,
@@ -465,7 +481,7 @@ class SensorController extends Controller
         ]);
 
         if (in_array($status, ['HAMA', 'WASPADA'])) {
-            $this->createNotification($status, $nilaiFuzzy, $sensor);
+            $this->createNotification($status,  $sensor);
         }
 
         return redirect()->route('dashboard')
