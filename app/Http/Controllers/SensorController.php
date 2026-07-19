@@ -135,12 +135,7 @@ class SensorController extends Controller
     private function getStatusGlobal()
     {
         $latest       = SensorReading::latest()->first();
-        $statusGlobal = 'AMAN';
-        if ($latest) {
-            $nilai = $this->resolveFuzzyValue($latest);
-            [$statusGlobal] = $this->getStatus($nilai);
-        }
-        return $statusGlobal;
+        return $latest->deteksi ?? 'AMAN';
     }
 
     // ================== HELPER: STATUS AIR ==================
@@ -477,11 +472,12 @@ class SensorController extends Controller
             'kelembapan_udara' => $udara,
             'kelembapan_tanah' => $tanah,
             'nilai_fuzzy'      => $nilaiFuzzy,
+            'nilai_hybrid'     => $nilaiFuzzy,
             'deteksi'          => $status,
         ]);
 
         if (in_array($status, ['HAMA', 'WASPADA'])) {
-            $this->createNotification($status,  $sensor);
+            $this->createNotification($status, $nilaiFuzzy, $sensor);
         }
 
         return redirect()->route('dashboard')
@@ -982,10 +978,8 @@ class SensorController extends Controller
         $data = $query->paginate(15);
 
         $data->getCollection()->transform(function ($item) {
-            $nilai = $this->resolveFuzzyValue($item);
-            [$status] = $this->getStatus($nilai);
-            $item->nilai = round($nilai, 3);
-            $item->status = $status;
+            $item->nilai = round($item->nilai_fuzzy ?? 0, 3);
+            $item->status = $item->deteksi;
             return $item;
         });
 

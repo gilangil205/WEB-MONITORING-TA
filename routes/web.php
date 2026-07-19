@@ -39,10 +39,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 });
 
 // ============================================================
-// RUTE API
+// RUTE API (didefinisikan di routes/api.php)
 // ============================================================
-Route::post('/api/sensor', [SensorController::class, 'store']);
-Route::get('/api/kamera/latest', [SensorController::class, 'kameraLatest'])->name('kamera.api');
 
 if (app()->environment('local', 'staging')) {
     Route::get('/debug/fuzzy', [SensorController::class, 'debugFuzzy'])->name('debug.fuzzy');
