@@ -599,16 +599,12 @@ class SensorController extends Controller
             $waterClass = $water['class'];
             $waterRecommendation = $water['rekomendasi'];
             $waterTanah = $water['nilai_tanah'];
-        } elseif ($latest) {
-            $tanah = $latest->kelembapan_tanah ?? 0;
-            $udara = $latest->kelembapan_udara ?? 0;
-            $suhu  = $latest->suhu ?? 0;
-
-            $water = $this->getWaterStatus($tanah, $udara, $suhu);
-            $waterStatus = $water['status'];
-            $waterClass = $water['class'];
-            $waterRecommendation = $water['rekomendasi'];
-            $waterTanah = $water['nilai_tanah'];
+        } else {
+            // Saat offline, set semua ke nilai offline
+            $waterStatus = 'OFFLINE';
+            $waterClass = 'status-offline';
+            $waterRecommendation = 'Perangkat IoT tidak terhubung. Periksa koneksi dan pastikan ESP32 menyala.';
+            $waterTanah = null;
         }
 
         $labels     = $data->pluck('created_at')->map(fn($d) => $d->format('H:i'))->values();

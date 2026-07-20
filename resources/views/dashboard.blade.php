@@ -27,17 +27,31 @@
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
     
     {{-- Kotak 1: Kesehatan Tanah --}}
-    <div class="panel" style="border-left:4px solid {{ $waterClass == 'status-critical' ? '#dc2626' : ($waterClass == 'status-warning' ? '#f59e0b' : '#22c55e') }};">
+    <div id="live-water-card" class="panel" style="border-left:4px solid 
+        @if(!$isOnline) #94a3b8
+        @elseif($waterClass == 'status-critical') #dc2626
+        @elseif($waterClass == 'status-warning') #f59e0b
+        @else #22c55e
+        @endif;">
         <div class="panel-header">
             <div class="panel-title">🌱 Kesehatan Tanah</div>
-            <span style="font-size:12px; color:#64748b;">Kelembapan: {{ number_format($waterTanah, 1) }}%</span>
+            <span id="live-water-kelembapan" style="font-size:12px; color:#64748b; @if(!$isOnline) display:none; @endif">
+                Kelembapan: <span id="live-water-kelembapan-val">{{ $isOnline ? number_format($waterTanah, 1) : '--' }}</span>%
+            </span>
         </div>
         <div class="panel-body">
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                <span style="font-size:24px; font-weight:700; color:{{ $waterClass == 'status-critical' ? '#dc2626' : ($waterClass == 'status-warning' ? '#f59e0b' : '#22c55e') }};">
-                    {{ $waterStatus }}
-                </span>
-                <span style="font-size:13px; color:#475569;">{{ $waterRecommendation }}</span>
+                @if(!$isOnline)
+                    <span id="live-water-text" style="font-size:24px; font-weight:700; color:#94a3b8;">
+                        📡 OFFLINE
+                    </span>
+                    <span id="live-water-rek" style="font-size:13px; color:#475569;">Menunggu koneksi IoT...</span>
+                @else
+                    <span id="live-water-text" style="font-size:24px; font-weight:700; color:{{ $waterClass == 'status-critical' ? '#dc2626' : ($waterClass == 'status-warning' ? '#f59e0b' : '#22c55e') }};">
+                        {{ $waterStatus }}
+                    </span>
+                    <span id="live-water-rek" style="font-size:13px; color:#475569;">{{ $waterRecommendation }}</span>
+                @endif
             </div>
         </div>
     </div>
@@ -51,7 +65,7 @@
         @endif;">
         <div class="panel-header">
             <div class="panel-title">🐛 Status Prediksi Hama</div>
-            <span style="font-size:12px; color:#64748b;">Nilai Fuzzy: {{ $isOnline ? number_format($nilai, 3) : '--' }}</span>
+            <span style="font-size:12px; color:#64748b;">Nilai Fuzzy: <span id="live-fuzzy-val-header">{{ $isOnline ? number_format($nilai, 3) : '--' }}</span></span>
         </div>
         <div class="panel-body" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
             <span class="sc-icon" id="live-status-icon" style="font-size:28px;">
@@ -451,6 +465,9 @@
                 var statusIcon = document.getElementById('live-status-icon');
                 var statusText = document.getElementById('live-status-text');
                 var statusBadge = document.getElementById('live-status-badge-besar');
+                var fuzzyValHeader = document.getElementById('live-fuzzy-val-header');
+
+                if (fuzzyValHeader) fuzzyValHeader.innerText = nilaiFuzzy.toFixed(3);
 
                 if (statusHama === 'HAMA') {
                     if (statusCard)  statusCard.style.borderLeftColor = '#dc2626';
@@ -468,6 +485,60 @@
                     if (statusText)  statusText.innerText  = 'Aman';
                     if (statusBadge) { statusBadge.className = 'status-badge-besar badge-aman'; statusBadge.innerText = 'AMAN | ' + nilaiFuzzy.toFixed(3); }
                 }
+
+                // Update Kesehatan Tanah card
+                var waterCard = document.getElementById('live-water-card');
+                var waterText = document.getElementById('live-water-text');
+                var waterRek = document.getElementById('live-water-rek');
+                var waterKelembapan = document.getElementById('live-water-kelembapan');
+                var waterKelembapanVal = document.getElementById('live-water-kelembapan-val');
+
+                if (waterKelembapan) waterKelembapan.style.display = 'inline';
+                if (waterKelembapanVal) waterKelembapanVal.innerText = tanah.toFixed(1);
+
+                var wStatus = '✅ CUKUP';
+                var wColor = '#22c55e';
+                var wRek = 'Kelembapan tanah normal.';
+
+                if (tanah < 30) {
+                    wStatus = '🚨 KERING PARAH';
+                    wColor = '#dc2626';
+                    wRek = 'Segera lakukan penyiraman dengan volume banyak! Tanah sangat kering.';
+                } else if (tanah < 45) {
+                    wStatus = '⚠️ KERING';
+                    wColor = '#f59e0b';
+                    wRek = 'Lakukan penyiraman sekarang. Tanah mulai mengering.';
+                } else if (tanah >= 45 && tanah <= 70) {
+                    wStatus = '✅ CUKUP';
+                    wColor = '#22c55e';
+                    wRek = 'Kelembapan tanah ideal. Pertahankan kondisi ini.';
+                } else if (tanah > 70 && tanah <= 85) {
+                    wStatus = '🌧️ LEMBAP';
+                    wColor = '#f59e0b';
+                    wRek = 'Tanah cukup lembap. Kurangi penyiraman jika hujan.';
+                } else if (tanah > 85) {
+                    wStatus = '🌊 TERLALU BASAH';
+                    wColor = '#dc2626';
+                    wRek = 'Hentikan penyiraman! Perbaiki drainase untuk mencegah akar busuk.';
+                }
+
+                if (suhu > 30 && udara < 50 && tanah < 50) {
+                    wStatus = '🔥 KERING + PANAS';
+                    wColor = '#dc2626';
+                    wRek = 'Kondisi panas dan udara kering mempercepat penguapan. Segera siram!';
+                } else if (suhu > 30 && tanah < 60) {
+                    wStatus = '☀️ KERING & PANAS';
+                    wColor = '#f59e0b';
+                    wRek = 'Suhu tinggi. Periksa kelembapan tanah dan siram jika perlu.';
+                } else if (suhu < 20 && tanah > 75) {
+                    wStatus = '🥶 DINGIN & BASAH';
+                    wColor = '#f59e0b';
+                    wRek = 'Suhu rendah dan tanah basah. Kurangi penyiraman.';
+                }
+
+                if (waterCard) waterCard.style.borderLeftColor = wColor;
+                if (waterText) { waterText.innerText = wStatus; waterText.style.color = wColor; }
+                if (waterRek) waterRek.innerText = wRek;
 
                 // Update fuzzy meter
                 var meterVal = document.getElementById('live-fuzzy-meter-val');
@@ -530,11 +601,25 @@
         var statusIcon = document.getElementById('live-status-icon');
         var statusText = document.getElementById('live-status-text');
         var statusBadge = document.getElementById('live-status-badge-besar');
+        var fuzzyValHeader = document.getElementById('live-fuzzy-val-header');
+
+        if (fuzzyValHeader) fuzzyValHeader.innerText = '--';
 
         if (statusCard)  statusCard.style.borderLeftColor = '#94a3b8';
         if (statusIcon)  statusIcon.innerText  = '📡';
         if (statusText)  statusText.innerText  = 'Offline';
         if (statusBadge) { statusBadge.className = 'status-badge-besar badge-offline'; statusBadge.innerText = 'OFFLINE'; }
+
+        // Update Kesehatan Tanah card
+        var waterCard = document.getElementById('live-water-card');
+        var waterText = document.getElementById('live-water-text');
+        var waterRek = document.getElementById('live-water-rek');
+        var waterKelembapan = document.getElementById('live-water-kelembapan');
+
+        if (waterCard) waterCard.style.borderLeftColor = '#94a3b8';
+        if (waterText) { waterText.innerText = '📡 OFFLINE'; waterText.style.color = '#94a3b8'; }
+        if (waterRek) waterRek.innerText = 'Menunggu koneksi IoT...';
+        if (waterKelembapan) waterKelembapan.style.display = 'none';
 
         var meterVal = document.getElementById('live-fuzzy-meter-val');
         if (meterVal) { meterVal.innerText = '--'; meterVal.style.color = '#94a3b8'; }
