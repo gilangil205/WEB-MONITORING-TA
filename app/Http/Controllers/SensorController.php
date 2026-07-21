@@ -124,6 +124,22 @@ class SensorController extends Controller
         if (Cache::has('iot_live_data')) {
             $d         = Cache::get('iot_live_data');
             $updatedAt = isset($d['updated_at']) ? Carbon::parse($d['updated_at']) : now();
+            
+            // ── BACA CACHE YOLO (Agar sinkron jika MQTT berjalan terpisah) ──
+            if (Cache::has('yolo_live_data')) {
+                $yolo = Cache::get('yolo_live_data');
+                $d['deteksi_yolo']       = $yolo['deteksi_yolo'] ?? null;
+                $d['confidence_yolo']    = $yolo['confidence_yolo'] ?? null;
+                $d['hasil_deteksi_yolo'] = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
+                
+                // Kalkulasi ulang Keputusan Sistem jika YOLO aktif
+                if ($d['hasil_deteksi_yolo'] === 'ON' || ($d['prediksi_sensor'] ?? 'AMAN') === 'HAMA') {
+                    $d['keputusan_sistem'] = 'HAMA';
+                } else {
+                    $d['keputusan_sistem'] = $d['prediksi_sensor'] ?? 'AMAN';
+                }
+                $d['deteksi'] = $d['keputusan_sistem'];
+            }
 
             return response()->json([
                 'success'             => true,
@@ -138,6 +154,9 @@ class SensorController extends Controller
                 'image_url'           => $d['image']            ?? null,
                 'deteksi_yolo'        => $d['deteksi_yolo']     ?? null,
                 'confidence_yolo'     => $d['confidence_yolo']  ?? null,
+                'prediksi_sensor'     => $d['prediksi_sensor']  ?? ($d['deteksi'] ?? 'AMAN'),
+                'hasil_deteksi_yolo'  => $d['hasil_deteksi_yolo'] ?? 'OFF',
+                'keputusan_sistem'    => $d['keputusan_sistem'] ?? ($d['deteksi'] ?? 'AMAN'),
                 'timestamp_iso'       => $updatedAt->toISOString(),
                 'timestamp_formatted' => $updatedAt->format('d M Y, H:i'),
                 'timestamp_time'      => $updatedAt->format('H:i'),
@@ -160,6 +179,9 @@ class SensorController extends Controller
             'image_url'           => null,
             'deteksi_yolo'        => null,
             'confidence_yolo'     => null,
+            'prediksi_sensor'     => null,
+            'hasil_deteksi_yolo'  => null,
+            'keputusan_sistem'    => null,
             'timestamp_iso'       => null,
             'timestamp_formatted' => null,
             'timestamp_time'      => null,
@@ -175,6 +197,22 @@ class SensorController extends Controller
         if (Cache::has('iot_live_data')) {
             $d         = Cache::get('iot_live_data');
             $updatedAt = isset($d['updated_at']) ? Carbon::parse($d['updated_at']) : now();
+            
+            // ── BACA CACHE YOLO ──
+            if (Cache::has('yolo_live_data')) {
+                $yolo = Cache::get('yolo_live_data');
+                $d['deteksi_yolo']       = $yolo['deteksi_yolo'] ?? null;
+                $d['confidence_yolo']    = $yolo['confidence_yolo'] ?? null;
+                $d['hasil_deteksi_yolo'] = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
+                
+                // Kalkulasi ulang Keputusan Sistem
+                if ($d['hasil_deteksi_yolo'] === 'ON' || ($d['prediksi_sensor'] ?? 'AMAN') === 'HAMA') {
+                    $d['keputusan_sistem'] = 'HAMA';
+                } else {
+                    $d['keputusan_sistem'] = $d['prediksi_sensor'] ?? 'AMAN';
+                }
+                $d['deteksi'] = $d['keputusan_sistem'];
+            }
         } else {
             return response()->json(['success' => false, 'isOnline' => false]);
         }
@@ -194,6 +232,9 @@ class SensorController extends Controller
             'image'               => $d['image'] ?? null,
             'deteksi_yolo'        => $d['deteksi_yolo'] ?? null,
             'confidence_yolo'     => $d['confidence_yolo'] ?? null,
+            'prediksi_sensor'     => $d['prediksi_sensor'] ?? ($d['deteksi'] ?? 'AMAN'),
+            'hasil_deteksi_yolo'  => $d['hasil_deteksi_yolo'] ?? 'OFF',
+            'keputusan_sistem'    => $d['keputusan_sistem'] ?? ($d['deteksi'] ?? 'AMAN'),
             'formatted_timestamp' => $updatedAt->format('d M Y — H:i:s'),
             'formatted_time'      => $updatedAt->format('H:i, d M Y'),
             'rekomendasi'         => $rekomendasi,
@@ -277,61 +318,125 @@ class SensorController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
+        // 1. MAPPING PAYLOAD PYTHON (YOLO)
+        $isYoloOnly = $request->input('sensor_name') === 'yolo_mouse_detector';
+
+        // 2. VALIDASI DINAMIS (Tidak Mewajibkan Sensor untuk YOLO)
         $request->validate([
-            'suhu_udara'       => 'required|numeric|between:0,60',
-            'kelembapan_udara' => 'required|numeric|between:0,100',
-            'kelembapan_tanah' => 'required|numeric|between:0,100',
+            'suhu_udara'       => $isYoloOnly ? 'nullable|numeric' : 'required|numeric|between:0,60',
+            'kelembapan_udara' => $isYoloOnly ? 'nullable|numeric' : 'required|numeric|between:0,100',
+            'kelembapan_tanah' => $isYoloOnly ? 'nullable|numeric' : 'required|numeric|between:0,100',
             'image'            => 'nullable|image|max:5120',
             'deteksi_yolo'     => 'nullable|string|max:255',
             'confidence_yolo'  => 'nullable|numeric|between:0,1',
+            // Field Python Payload
+            'status'           => 'nullable|string',
+            'value'            => 'nullable|numeric',
         ]);
+
+        // 3. AMBIL DATA SENSOR (TIDAK MENGGUNAKAN DEFAULT 0)
+        if ($isYoloOnly && !$request->has('suhu_udara')) {
+            if (Cache::has('iot_live_data')) {
+                $cache = Cache::get('iot_live_data');
+                $suhu  = $cache['suhu'] ?? null;
+                $udara = $cache['kelembapan_udara'] ?? null;
+                $tanah = $cache['kelembapan_tanah'] ?? null;
+            } else {
+                $latest = SensorReading::latest()->first();
+                if ($latest) {
+                    $suhu  = $latest->suhu;
+                    $udara = $latest->kelembapan_udara;
+                    $tanah = $latest->kelembapan_tanah;
+                } else {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Data sensor terakhir tidak ditemukan. Decision Rule tidak dapat diproses.'
+                    ], 400);
+                }
+            }
+        } else {
+            $suhu  = $request->suhu_udara;
+            $udara = $request->kelembapan_udara;
+            $tanah = $request->kelembapan_tanah;
+        }
 
         $path = null;
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('kamera', 'public');
         }
 
-        $nilaiFuzzy = $this->fuzzySugeno(
-            $request->suhu_udara,
-            $request->kelembapan_udara,
-            $request->kelembapan_tanah
-        );
+        $nilaiFuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);
 
-        [$status, $class] = $this->getStatus($nilaiFuzzy);
+        // 1. Prediksi Sensor dari Fuzzy Sugeno
+        [$prediksiSensor, $class] = $this->getStatus($nilaiFuzzy);
 
-        Cache::put('iot_live_data', [
-            'suhu'             => $request->suhu_udara,
-            'kelembapan_udara' => $request->kelembapan_udara,
-            'kelembapan_tanah' => $request->kelembapan_tanah,
+        // 2. Hasil Deteksi YOLO (Memetakan status & value Python, fallback ke field lama)
+        $inputDeteksiYolo = $request->input('status') ?? $request->input('deteksi_yolo');
+        $inputConfidenceYolo = $request->input('value') ?? $request->input('confidence_yolo');
+        
+        $yoloInput = strtoupper(trim($inputDeteksiYolo ?? 'OFF'));
+        $hasilDeteksiYolo = ($yoloInput === 'ON') ? 'ON' : 'OFF';
+
+        // 3. Keputusan Sistem (Sesuai Tabel Decision Rule)
+        if ($hasilDeteksiYolo === 'ON' || $prediksiSensor === 'HAMA') {
+            $keputusanSistem = 'HAMA';
+        } else {
+            $keputusanSistem = $prediksiSensor; // 'AMAN' atau 'WASPADA'
+        }
+
+        $newData = [
+            'suhu'             => $suhu,
+            'kelembapan_udara' => $udara,
+            'kelembapan_tanah' => $tanah,
             'nilai_fuzzy'      => round($nilaiFuzzy, 4),
-            'deteksi'          => $status,
-            'deteksi_yolo'     => $request->deteksi_yolo,
-            'confidence_yolo'  => $request->confidence_yolo,
+            'deteksi'          => $keputusanSistem,
+            'deteksi_yolo'     => $inputDeteksiYolo,
+            'confidence_yolo'  => $inputConfidenceYolo,
+            'prediksi_sensor'  => $prediksiSensor,
+            'hasil_deteksi_yolo' => $hasilDeteksiYolo,
+            'keputusan_sistem' => $keputusanSistem,
             'image'            => $path ? asset('storage/' . $path) : null,
             'updated_at'       => now()->toIso8601String(),
-        ], now()->addMinutes(7));
+        ];
+
+        // ── CACHE HANDLING ──
+        if (!$isYoloOnly) {
+            // ESP32 Request: Update status alat menjadi ONLINE (TTL 7 menit)
+            Cache::put('iot_live_data', $newData, now()->addMinutes(7));
+        } else {
+            // Python YOLO Request: Simpan status YOLO TANPA mengubah status ONLINE ESP32
+            Cache::put('yolo_live_data', [
+                'deteksi_yolo'       => $inputDeteksiYolo,
+                'confidence_yolo'    => $inputConfidenceYolo,
+                'hasil_deteksi_yolo' => $hasilDeteksiYolo,
+                'keputusan_sistem'   => $keputusanSistem,
+            ], now()->addMinutes(2));
+        }
 
         $sensor = SensorReading::create([
-            'suhu'             => $request->suhu_udara,
-            'kelembapan_udara' => $request->kelembapan_udara,
-            'kelembapan_tanah' => $request->kelembapan_tanah,
+            'suhu'             => $suhu,
+            'kelembapan_udara' => $udara,
+            'kelembapan_tanah' => $tanah,
             'nilai_fuzzy'      => $nilaiFuzzy,
             'image'            => $path,
-            'deteksi'          => $status,
-            'deteksi_yolo'     => $request->deteksi_yolo,
-            'confidence_yolo'  => $request->confidence_yolo,
+            'deteksi'          => $keputusanSistem,
+            'deteksi_yolo'     => $inputDeteksiYolo,
+            'confidence_yolo'  => $inputConfidenceYolo,
         ]);
 
-        if (in_array($status, ['HAMA', 'WASPADA'])) {
-            $this->createNotification($status, $nilaiFuzzy, $sensor);
+        if (in_array($keputusanSistem, ['HAMA', 'WASPADA'])) {
+            $this->createNotification($keputusanSistem, $nilaiFuzzy, $sensor);
         }
 
         return response()->json([
             'message'            => 'Data diproses',
-            'status'             => $status,
+            'status'             => $keputusanSistem,
             'nilai_fuzzy'        => round($nilaiFuzzy, 4),
-            'deteksi_yolo'       => $request->deteksi_yolo,
-            'confidence_yolo'    => $request->confidence_yolo,
+            'deteksi_yolo'       => $inputDeteksiYolo,
+            'confidence_yolo'    => $inputConfidenceYolo,
+            'prediksi_sensor'    => $prediksiSensor,
+            'hasil_deteksi_yolo' => $hasilDeteksiYolo,
+            'keputusan_sistem'   => $keputusanSistem,
             'stored_in_cache'    => true,
             'stored_in_database' => true,
         ], 201);
@@ -358,18 +463,30 @@ class SensorController extends Controller
         }
 
         $nilaiFuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);
-        [$status] = $this->getStatus($nilaiFuzzy);
+        
+        // 1. Prediksi Sensor dari Fuzzy Sugeno
+        [$prediksiSensor] = $this->getStatus($nilaiFuzzy);
+
+        // 2. Hasil Deteksi YOLO (Manual = OFF)
+        $hasilDeteksiYolo = 'OFF';
+
+        // 3. Keputusan Sistem (Sesuai Tabel Decision Rule)
+        if ($hasilDeteksiYolo === 'ON' || $prediksiSensor === 'HAMA') {
+            $keputusanSistem = 'HAMA';
+        } else {
+            $keputusanSistem = $prediksiSensor; // 'AMAN' atau 'WASPADA'
+        }
 
         $sensor = SensorReading::create([
             'suhu'             => $suhu,
             'kelembapan_udara' => $udara,
             'kelembapan_tanah' => $tanah,
             'nilai_fuzzy'      => $nilaiFuzzy,
-            'deteksi'          => $status,
+            'deteksi'          => $keputusanSistem,
         ]);
 
-        if (in_array($status, ['HAMA', 'WASPADA'])) {
-            $this->createNotification($status, $nilaiFuzzy, $sensor);
+        if (in_array($keputusanSistem, ['HAMA', 'WASPADA'])) {
+            $this->createNotification($keputusanSistem, $nilaiFuzzy, $sensor);
         }
 
         return redirect()->route('dashboard')

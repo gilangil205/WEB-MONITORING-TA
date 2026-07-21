@@ -232,9 +232,35 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
             </div>
             <div class="panel-body">
 
-                <!-- Placeholder Sederhana untuk Tahap Berikutnya -->
-                <div class="analisis-placeholder" style="padding:14px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; text-align:center; color:#64748b; font-size:13px; margin-bottom:16px;">
-                    ℹ️ Modul analisis deteksi terpadu akan diperbarui pada tahap berikutnya.
+                <!-- DECISION RULE BREAKDOWN -->
+                <div class="decision-rule-container" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-bottom:16px;">
+                    <div style="font-size:12px; font-weight:700; color:var(--abu); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">Evaluasi Decision Rule</div>
+                    
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        <!-- Prediksi Sensor -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:white; border-radius:8px; border:1px solid #f1f5f9;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:18px;">🧮</span>
+                                <div>
+                                    <div style="font-size:12px; font-weight:600; color:var(--teks);">Prediksi Sensor (Fuzzy)</div>
+                                    <div style="font-size:11px; color:var(--abu);">Skor Fuzzy: <span id="dr-fuzzy-skor" style="font-family:'JetBrains Mono',monospace; font-weight:600;">{{ $isOnline ? round($latest->nilai_fuzzy ?? 0, 4) : '--' }}</span></div>
+                                </div>
+                            </div>
+                            <span id="dr-prediksi-badge" style="font-size:11px; font-weight:700; padding:4px 10px; border-radius:99px; background:#e2e8f0; color:#64748b;">--</span>
+                        </div>
+
+                        <!-- Deteksi YOLO -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:white; border-radius:8px; border:1px solid #f1f5f9;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:18px;">🎯</span>
+                                <div>
+                                    <div style="font-size:12px; font-weight:600; color:var(--teks);">Deteksi Visual YOLO</div>
+                                    <div style="font-size:11px; color:var(--abu);">Confidence: <span id="dr-yolo-conf" style="font-family:'JetBrains Mono',monospace; font-weight:600;">{{ $isOnline ? ($latest->confidence_yolo ?? '--') : '--' }}</span></div>
+                                </div>
+                            </div>
+                            <span id="dr-yolo-badge" style="font-size:11px; font-weight:700; padding:4px 10px; border-radius:99px; background:#e2e8f0; color:#64748b;">--</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- STATUS BESAR -->
@@ -247,7 +273,7 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
                     <span class="sb-icon" id="sb-icon">
                         @if(!$isOnline) 📡 @elseif($status=='HAMA') 🚨 @elseif($status=='WASPADA') ⚠️ @else 🌿 @endif
                     </span>
-                    <div class="sb-label">Status Deteksi Hama</div>
+                    <div class="sb-label">Keputusan Sistem Akhir</div>
                     <div id="sb-val" class="sb-val
                         @if(!$isOnline) offline
                         @elseif($status=='HAMA') hama
@@ -426,9 +452,39 @@ function fetchLatestCameraData() {
                 }
             }
 
-            // Update status display
+            // Update Decision Rule Breakdown
             var fuzzyVal = parseFloat(data.nilai) || 0;
-            var status = data.status;
+            elSet('dr-fuzzy-skor', fuzzyVal.toFixed(4));
+            
+            var predBadge = document.getElementById('dr-prediksi-badge');
+            if (predBadge) {
+                predBadge.innerText = data.prediksi_sensor || 'AMAN';
+                if (data.prediksi_sensor === 'HAMA') {
+                    predBadge.style.background = '#fee2e2'; predBadge.style.color = '#dc2626';
+                } else if (data.prediksi_sensor === 'WASPADA') {
+                    predBadge.style.background = '#fef9c3'; predBadge.style.color = '#d97706';
+                } else {
+                    predBadge.style.background = '#dcfce7'; predBadge.style.color = '#16a34a';
+                }
+            }
+
+            var yoloConf = data.confidence_yolo ? (parseFloat(data.confidence_yolo) * 100).toFixed(0) + '%' : '--';
+            elSet('dr-yolo-conf', yoloConf);
+            
+            var yoloBadge = document.getElementById('dr-yolo-badge');
+            if (yoloBadge) {
+                var yStatus = data.hasil_deteksi_yolo || 'OFF';
+                if (yStatus === 'ON') {
+                    yoloBadge.innerText = 'ON - TIKUS TERDETEKSI';
+                    yoloBadge.style.background = '#fee2e2'; yoloBadge.style.color = '#dc2626';
+                } else {
+                    yoloBadge.innerText = 'OFF - TIDAK ADA TIKUS';
+                    yoloBadge.style.background = '#dcfce7'; yoloBadge.style.color = '#16a34a';
+                }
+            }
+
+            // Update status display (Keputusan Sistem)
+            var status = data.keputusan_sistem || data.status;
 
             // Update status besar
             var panelBesar = document.getElementById('panel-status-besar');
@@ -488,9 +544,15 @@ function setKameraOffline() {
     ['mini-suhu','mini-kel-udara','mini-kel-tanah'].forEach(function(id) {
         var e = document.getElementById(id); if (e) e.innerText = '--';
     });
-    ['detail-suhu','detail-kel-udara','detail-kel-tanah','detail-time'].forEach(function(id) {
+    ['detail-suhu','detail-kel-udara','detail-kel-tanah','detail-time','dr-fuzzy-skor','dr-yolo-conf'].forEach(function(id) {
         var e = document.getElementById(id); if (e) e.innerText = '--';
     });
+    
+    var predBadge = document.getElementById('dr-prediksi-badge');
+    if (predBadge) { predBadge.innerText = 'OFFLINE'; predBadge.style.background = '#e2e8f0'; predBadge.style.color = '#64748b'; }
+    
+    var yoloBadge = document.getElementById('dr-yolo-badge');
+    if (yoloBadge) { yoloBadge.innerText = 'OFFLINE'; yoloBadge.style.background = '#e2e8f0'; yoloBadge.style.color = '#64748b'; }
 
     var miniCard = document.getElementById('mini-card-status');
     var miniIcon = document.getElementById('mini-icon-status');

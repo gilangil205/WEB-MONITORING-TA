@@ -64,7 +64,7 @@
         @else #22c55e
         @endif;">
         <div class="panel-header">
-            <div class="panel-title">🐛 Status Prediksi Hama</div>
+            <div class="panel-title">🧮 Keputusan Sistem Akhir</div>
             <span style="font-size:12px; color:#64748b;">Nilai Fuzzy: <span id="live-fuzzy-val-header">{{ $isOnline ? number_format($nilai, 3) : '--' }}</span></span>
         </div>
         <div class="panel-body" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
