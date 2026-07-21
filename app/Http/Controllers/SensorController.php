@@ -19,106 +19,7 @@ class SensorController extends Controller
     private const T_SUHU   = 3;
     private const T_LEMBAP = 5;
 
-    // ================== HELPER: HYBRID LOGIC (70% YOLO + 30% FUZZY) ==================
-    /**
-     * Hybrid decision logic
-     * 
-     * Flow:
-     * 1. Jika YOLO kosong atau confidence < 0.3 → fallback ke Fuzzy murni
-     * 2. Jika YOLO ada dan confidence >= 0.3 → hitung hybrid dengan interpretYoloDetection()
-     * 3. Formula: (YOLO_score × 0.7) + (Fuzzy × 0.3)
-     * 4. Return status berdasarkan hybrid value
-     */
- private function getHybridStatus(?string $deteksiYolo, ?float $confidenceYolo, float $nilaiFuzzy): array
-{
-    // FALLBACK: Jika YOLO tidak tersedia atau confidence rendah
-    if (empty($deteksiYolo) || $confidenceYolo === null || $confidenceYolo < 0.3) {
 
-        [$status, $class] = $this->getStatus($nilaiFuzzy);
-
-        return [
-            $status,
-            $class,
-            $nilaiFuzzy
-        ];
-    }
-
-    // Interpret hasil YOLO
-    $yoloScore = $this->interpretYoloDetection($deteksiYolo, $confidenceYolo);
-
-    // Hybrid = 70% YOLO + 30% Fuzzy
-    $nilaiHybrid = ($yoloScore * 0.7) + ($nilaiFuzzy * 0.3);
-    $nilaiHybrid = max(0, min(1, $nilaiHybrid));
-
-    [$status, $class] = $this->getStatus($nilaiHybrid);
-
-    return [
-        $status,
-        $class,
-        $nilaiHybrid
-    ];
-}
-
-    // ================== HELPER: INTERPRET YOLO DETECTION ==================
-    /**
-     * Interpret YOLO detection string dengan negation handling
-     * 
-     * @param string $deteksiYolo - YOLO output string
-     * @param float $confidenceYolo - YOLO confidence score
-     * @return float - yolo_score (0 = no pest, >= 0.7 = pest detected)
-     */
-    private function interpretYoloDetection(string $deteksiYolo, float $confidenceYolo): float
-    {
-        // Normalize string
-        $deteksi = strtolower(trim($deteksiYolo));
-
-        // NEGATION KEYWORDS (prioritas tinggi)
-        $negationKeywords = [
-            'tidak',        // "Tidak Ada Hama"
-            'tidak ada',    // "Tidak Ada Hama"
-            'no ',          // "No Pest", "No Detection"
-            'none',         // "None"
-            'belum',        // "Belum Ada Hama"
-            'empty',        // "Empty / Kosong"
-            'clear',        // "Clear / Bersih"
-            'aman',         // "Aman"
-            'negatif',      // "Negatif"
-            'negative'      // "Negative"
-        ];
-
-        // PEST KEYWORDS (hanya jika tidak ada negation)
-        $pestKeywords = [
-            'terdeteksi',   // "Tikus Terdeteksi"
-            'detected',     // "Pest Detected"
-            'found',        // "Pest Found"
-            'ada',          // "Ada Hama"
-            'tikus',        // "Tikus"
-            'mouse',        // "Mouse"
-            'rat',          // "Rat"
-            'serangga',     // "Serangga"
-            'insect',       // "Insect"
-            'hama'          // "Hama" (tetapi harus tidak ada negation)
-        ];
-
-        // STEP 1: Check negation
-        foreach ($negationKeywords as $neg) {
-            if (strpos($deteksi, $neg) !== false) {
-                // Negation found → NO PEST
-                return 0;
-            }
-        }
-
-        // STEP 2: Check pest keywords (only if no negation)
-        foreach ($pestKeywords as $pest) {
-            if (strpos($deteksi, $pest) !== false) {
-                // Pest keyword found → PEST DETECTED
-                return max($confidenceYolo, 0.7);
-            }
-        }
-
-        // STEP 3: Jika tidak ada keyword yang match → NO DETECTION (safe default)
-        return 0;
-    }
 
     // ================== HELPER: RESOLVE NILAI FUZZY ==================
     private function resolveFuzzyValue(mixed $item)
@@ -196,10 +97,10 @@ class SensorController extends Controller
 
         if ($status === 'HAMA') {
             $title = '🚨 Peringatan Hama Terdeteksi!';
-            $message = "Sistem mendeteksi risiko serangan hama tinggi dengan nilai hybrid {$nilai}. Segera periksa kondisi tanaman jagung Anda.";
+            $message = "Sistem mendeteksi risiko serangan hama tinggi dengan nilai fuzzy {$nilai}. Segera periksa kondisi tanaman jagung Anda.";
         } elseif ($status === 'WASPADA') {
             $title = '⚠️ Status Waspada Hama';
-            $message = "Kondisi lingkungan mulai mengarah ke risiko hama (nilai hybrid {$nilai}). Tingkatkan frekuensi monitoring.";
+            $message = "Kondisi lingkungan mulai mengarah ke risiko hama (nilai fuzzy {$nilai}). Tingkatkan frekuensi monitoring.";
         } else {
             return;
         }
@@ -327,7 +228,7 @@ class SensorController extends Controller
     }
 
     // ================== BUILD RIWAYAT HTML ==================
-    // ✅ FIX: Gunakan stored status (hybrid) dari database, bukan recalculate
+    // ✅ FIX: Gunakan stored status dari database, bukan recalculate
     private function buildRiwayatHtml(Collection $fotoData): string
     {
         if ($fotoData->isEmpty()) {
@@ -337,7 +238,7 @@ class SensorController extends Controller
         $html = '<div class="foto-grid">';
         
         foreach ($fotoData as $fd) {
-            // ✅ FIXED: Gunakan stored status (hybrid) dari database
+            // ✅ FIXED: Gunakan stored status dari database
             // Ini adalah sumber kebenaran untuk status
             $statusR = $fd->deteksi;  
             
@@ -396,19 +297,13 @@ class SensorController extends Controller
             $request->kelembapan_tanah
         );
 
-        // 🔥 HYBRID LOGIC: 70% YOLO + 30% Fuzzy
-      [$status, $class, $nilaiHybrid] = $this->getHybridStatus(
-            $request->deteksi_yolo,
-            $request->confidence_yolo,
-            $nilaiFuzzy
-        );
+        [$status, $class] = $this->getStatus($nilaiFuzzy);
 
         Cache::put('iot_live_data', [
             'suhu'             => $request->suhu_udara,
             'kelembapan_udara' => $request->kelembapan_udara,
             'kelembapan_tanah' => $request->kelembapan_tanah,
             'nilai_fuzzy'      => round($nilaiFuzzy, 4),
-            'nilai_hybrid'     => round($nilaiHybrid, 4),
             'deteksi'          => $status,
             'deteksi_yolo'     => $request->deteksi_yolo,
             'confidence_yolo'  => $request->confidence_yolo,
@@ -421,7 +316,6 @@ class SensorController extends Controller
             'kelembapan_udara' => $request->kelembapan_udara,
             'kelembapan_tanah' => $request->kelembapan_tanah,
             'nilai_fuzzy'      => $nilaiFuzzy,
-            'nilai_hybrid'     => $nilaiHybrid,
             'image'            => $path,
             'deteksi'          => $status,
             'deteksi_yolo'     => $request->deteksi_yolo,
@@ -436,7 +330,6 @@ class SensorController extends Controller
             'message'            => 'Data diproses',
             'status'             => $status,
             'nilai_fuzzy'        => round($nilaiFuzzy, 4),
-            'nilai_hybrid'       => round($nilaiHybrid, 4), 
             'deteksi_yolo'       => $request->deteksi_yolo,
             'confidence_yolo'    => $request->confidence_yolo,
             'stored_in_cache'    => true,
@@ -472,7 +365,6 @@ class SensorController extends Controller
             'kelembapan_udara' => $udara,
             'kelembapan_tanah' => $tanah,
             'nilai_fuzzy'      => $nilaiFuzzy,
-            'nilai_hybrid'     => $nilaiFuzzy,
             'deteksi'          => $status,
         ]);
 
@@ -686,10 +578,10 @@ class SensorController extends Controller
 
         $data = $query->paginate(10);
 
-        // ✅ PERBAIKAN: Gunakan status yang sudah disimpan di database (hasil hybrid)
+        // ✅ PERBAIKAN: Gunakan status yang sudah disimpan di database
         $data->getCollection()->transform(function ($item) {
             $item->nilai   = round($item->nilai_fuzzy ?? 0, 3);
-            $item->status  = $item->deteksi; // status sudah benar dari hybrid
+            $item->status  = $item->deteksi; // status sudah disimpan di DB
             return $item;
         });
 

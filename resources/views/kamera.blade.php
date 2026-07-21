@@ -121,116 +121,6 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
     .kamera-grid { grid-template-columns:1fr; }
 }
 
-/* ===== TAMBAHAN CSS UNTUK BREAKDOWN HYBRID ===== */
-.fuzzy-breakdown-container {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 16px;
-    margin: 12px 0;
-}
-
-.breakdown-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px dashed #e2e8f0;
-}
-
-.breakdown-row:last-child {
-    border-bottom: none;
-}
-
-.breakdown-left {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.breakdown-label {
-    font-size: 12px;
-    color: #64748b;
-}
-
-.breakdown-value {
-    font-size: 18px;
-    font-weight: 700;
-    color: #1e293b;
-    font-family: 'JetBrains Mono', monospace;
-}
-
-.breakdown-value.final {
-    font-size: 22px;
-    color: #dc2626;
-}
-
-.breakdown-operator {
-    font-size: 16px;
-    color: #94a3b8;
-    padding: 0 12px;
-    font-weight: 700;
-}
-
-.breakdown-equals {
-    text-align: center;
-    font-size: 24px;
-    font-weight: 700;
-    color: #475569;
-    padding: 8px 0;
-}
-
-.breakdown-result {
-    background: white;
-    border: 2px solid #3b82f6;
-    border-radius: 6px;
-    padding: 12px 16px;
-    margin-top: 8px;
-}
-
-.breakdown-source {
-    font-size: 11px;
-    color: #94a3b8;
-}
-
-.breakdown-status {
-    font-size: 14px;
-    font-weight: 600;
-    color: #475569;
-}
-
-.breakdown-status.badge-hama { color: #dc2626; }
-.breakdown-status.badge-waspada { color: #d97706; }
-.breakdown-status.badge-aman { color: #16a34a; }
-
-.formula-box {
-    background: #f1f5f9;
-    border-left: 4px solid #3b82f6;
-    padding: 10px 14px;
-    border-radius: 4px;
-    margin: 12px 0;
-    font-size: 12px;
-    font-family: 'JetBrains Mono', monospace;
-    color: #334155;
-}
-
-.methodology-explanation {
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    border-radius: 6px;
-    padding: 12px 16px;
-    margin: 12px 0;
-    font-size: 12px;
-    line-height: 1.7;
-    color: #1e3a8a;
-}
-
-.explanation-title {
-    font-weight: 700;
-    color: #1d4ed8;
-    margin-bottom: 4px;
-}
 </style>
 
 <div class="page-header">
@@ -335,82 +225,16 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
 
     <div style="display:flex; flex-direction:column; gap:16px;">
 
-        <!-- ================== PANEL HASIL DETEKSI (DIPERBAIKI) ================== -->
+        <!-- ================== PANEL HASIL DETEKSI ================== -->
         <div class="panel">
             <div class="panel-header">
-                <div class="panel-title">🧮 Hasil Analisis Sensor &amp; YOLO</div>
-                <span style="font-size:11px; color:#64748b;">Hybrid Decision</span>
+                <div class="panel-title">🧮 Hasil Analisis Sensor</div>
             </div>
             <div class="panel-body">
 
-                <!-- ✅ FIX: Transparent breakdown of hybrid calculation -->
-                <div class="fuzzy-breakdown-container">
-                    
-                    <!-- Row 1: YOLO Score -->
-                    <div class="breakdown-row">
-                        <div class="breakdown-left">
-                            <span class="breakdown-label">📹 YOLO Detection Score</span>
-                            <span class="breakdown-value" id="yolo-score-display">--</span>
-                            <span class="breakdown-source">Dari deteksi visual kamera</span>
-                        </div>
-                        <div class="breakdown-operator">
-                            <strong>×0.70</strong>
-                        </div>
-                    </div>
-                    
-                    <!-- Row 2: Fuzzy Score -->
-                    <div class="breakdown-row">
-                        <div class="breakdown-left">
-                            <span class="breakdown-label">🧮 Fuzzy Sugeno Score</span>
-                            <span class="breakdown-value" id="fuzzy-score-display">--</span>
-                            <span class="breakdown-source">Dari analisis sensor lingkungan</span>
-                        </div>
-                        <div class="breakdown-operator">
-                            <strong>×0.30</strong>
-                        </div>
-                    </div>
-                    
-                    <!-- Separator -->
-                    <div class="breakdown-equals">
-                        <strong>=</strong>
-                    </div>
-                    
-                    <!-- Row 3: Hybrid Result -->
-                    <div class="breakdown-result">
-                        <div class="breakdown-left" style="display:flex; align-items:center; justify-content:space-between;">
-                            <div>
-                                <span class="breakdown-label"><strong>🔀 Hybrid Status Akhir</strong></span>
-                                <span class="breakdown-value final" id="hybrid-score-display">--</span>
-                            </div>
-                            <div>
-                                <span class="breakdown-status" id="hybrid-status-display">--</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                </div>
-                
-                <!-- Formula Display for Reference -->
-                <div class="formula-box" id="formula-text">
-                    <code>Hybrid = (YOLO × 0.70) + (Fuzzy × 0.30)</code>
-                </div>
-                
-                <!-- Methodology Explanation -->
-                <div class="methodology-explanation">
-                    <div class="explanation-title">
-                        📚 Metodologi Tugas Akhir
-                    </div>
-                    <p>
-                        Status akhir sistem adalah kombinasi dari:
-                        <br>
-                        • <strong>70%</strong> Deteksi Visual dari Kamera (YOLO Object Detection)
-                        <br>
-                        • <strong>30%</strong> Analisis Sensor Lingkungan (Fuzzy Sugeno Logic)
-                        <br><br>
-                        Bobot ini diterapkan untuk memastikan keputusan yang <strong>robust</strong> dan
-                        <strong>reliable</strong>. Sistem tidak hanya bergantung pada deteksi visual,
-                        tetapi juga mempertimbangkan kondisi lingkungan yang mendukung perkembangan hama.
-                    </p>
+                <!-- Placeholder Sederhana untuk Tahap Berikutnya -->
+                <div class="analisis-placeholder" style="padding:14px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; text-align:center; color:#64748b; font-size:13px; margin-bottom:16px;">
+                    ℹ️ Modul analisis deteksi terpadu akan diperbarui pada tahap berikutnya.
                 </div>
 
                 <!-- STATUS BESAR -->
@@ -440,11 +264,11 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
                         @if(!$isOnline)
                             Perangkat IoT sedang tidak terhubung. Periksa koneksi jaringan ESP32.
                         @elseif($status=='HAMA')
-                            Nilai hybrid &ge; 0.70. Kondisi SANGAT RAWAN HAMA! Segera lakukan tindakan pengendalian.
+                            Nilai output fuzzy &ge; 0.70. Kondisi SANGAT RAWAN HAMA! Segera lakukan tindakan pengendalian.
                         @elseif($status=='WASPADA')
-                            Nilai hybrid 0.45–0.70. Kondisi mulai rawan. Tingkatkan monitoring.
+                            Nilai output fuzzy 0.45–0.70. Kondisi mulai rawan. Tingkatkan monitoring.
                         @else
-                            Nilai hybrid &lt; 0.45. Kondisi aman. Lanjutkan pemeliharaan rutin.
+                            Nilai output fuzzy &lt; 0.45. Kondisi aman. Lanjutkan pemeliharaan rutin.
                         @endif
                     </div>
                 </div>
@@ -602,41 +426,9 @@ function fetchLatestCameraData() {
                 }
             }
 
-            // ✅ FIX: Update breakdown display with hybrid formula
+            // Update status display
             var fuzzyVal = parseFloat(data.nilai) || 0;
-            var confidence = data.confidence_yolo;
-            var deteksiYolo = data.deteksi_yolo;
             var status = data.status;
-
-            // Interpret YOLO score (mimics server logic)
-            var yoloScore = 0;
-            if (confidence !== null && confidence !== undefined && confidence >= 0.3) {
-                var deteksi = (deteksiYolo || '').toLowerCase();
-                var negations = ['tidak', 'tidak ada', 'no ', 'none', 'belum', 'aman'];
-                var hasNegation = negations.some(function(neg) { return deteksi.indexOf(neg) !== -1; });
-                if (!hasNegation) {
-                    var pests = ['terdeteksi', 'detected', 'found', 'tikus', 'mouse', 'rat', 'hama'];
-                    var hasPest = pests.some(function(pest) { return deteksi.indexOf(pest) !== -1; });
-                    if (hasPest) {
-                        yoloScore = Math.max(confidence, 0.7);
-                    }
-                }
-            }
-
-            var hybridValue = (yoloScore * 0.7) + (fuzzyVal * 0.3);
-            hybridValue = Math.max(0, Math.min(1, hybridValue));
-
-            // Update breakdown DOM
-            document.getElementById('yolo-score-display').innerText = yoloScore.toFixed(4);
-            document.getElementById('fuzzy-score-display').innerText = fuzzyVal.toFixed(4);
-            document.getElementById('hybrid-score-display').innerText = hybridValue.toFixed(4);
-            
-            var statusDisplay = document.getElementById('hybrid-status-display');
-            statusDisplay.innerText = status;
-            statusDisplay.className = 'breakdown-status badge-' + (status === 'HAMA' ? 'hama' : (status === 'WASPADA' ? 'waspada' : 'aman'));
-
-            document.getElementById('formula-text').innerHTML = 
-                '<code>' + hybridValue.toFixed(4) + ' = (' + yoloScore.toFixed(4) + ' × 0.70) + (' + fuzzyVal.toFixed(4) + ' × 0.30)</code>';
 
             // Update status besar
             var panelBesar = document.getElementById('panel-status-besar');
@@ -651,17 +443,17 @@ function fetchLatestCameraData() {
                 if (panelBesar) panelBesar.classList.add('hama');
                 if (sbVal)  { sbVal.classList.add('hama');    sbVal.innerText = 'HAMA TERDETEKSI'; }
                 if (sbIcon)   sbIcon.innerText = '🚨';
-                if (sbDesc)   sbDesc.innerText = 'Nilai hybrid ≥ 0.70. Kondisi SANGAT RAWAN HAMA! Segera lakukan tindakan pengendalian.';
+                if (sbDesc)   sbDesc.innerText = 'Nilai output fuzzy ≥ 0.70. Kondisi SANGAT RAWAN HAMA! Segera lakukan tindakan pengendalian.';
             } else if (status === 'WASPADA') {
                 if (panelBesar) panelBesar.classList.add('waspada');
                 if (sbVal)  { sbVal.classList.add('waspada'); sbVal.innerText = 'PERLU WASPADA'; }
                 if (sbIcon)   sbIcon.innerText = '⚠️';
-                if (sbDesc)   sbDesc.innerText = 'Nilai hybrid 0.45–0.70. Kondisi mulai rawan. Tingkatkan monitoring.';
+                if (sbDesc)   sbDesc.innerText = 'Nilai output fuzzy 0.45–0.70. Kondisi mulai rawan. Tingkatkan monitoring.';
             } else {
                 if (panelBesar) panelBesar.classList.add('aman');
                 if (sbVal)  { sbVal.classList.add('aman');    sbVal.innerText = 'TANAMAN AMAN'; }
                 if (sbIcon)   sbIcon.innerText = '🌿';
-                if (sbDesc)   sbDesc.innerText = 'Nilai hybrid < 0.45. Kondisi aman. Lanjutkan pemeliharaan rutin.';
+                if (sbDesc)   sbDesc.innerText = 'Nilai output fuzzy < 0.45. Kondisi aman. Lanjutkan pemeliharaan rutin.';
             }
 
             var rekList = document.getElementById('rekomendasi-list');
@@ -723,13 +515,6 @@ function setKameraOffline() {
     if (sbIcon)     sbIcon.innerText     = '📡';
     if (sbVal)      { sbVal.className    = 'sb-val offline'; sbVal.innerText = 'ALAT OFFLINE'; }
     if (sbDesc)     sbDesc.innerText     = 'Perangkat IoT sedang tidak terhubung. Periksa koneksi jaringan ESP32.';
-
-    // Breakdown offline
-    document.getElementById('yolo-score-display').innerText = 'OFFLINE';
-    document.getElementById('fuzzy-score-display').innerText = '--';
-    document.getElementById('hybrid-score-display').innerText = '--';
-    document.getElementById('hybrid-status-display').innerText = '--';
-    document.getElementById('formula-text').innerHTML = '<code>Menunggu data dari IoT...</code>';
 
     var rekList = document.getElementById('rekomendasi-list');
     if (rekList) rekList.innerHTML =
