@@ -222,7 +222,15 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
 
             <div class="refresh-info">
                 <div class="refresh-spin"></div>
-                <span>Gambar &amp; data diperbarui otomatis setiap 5 detik dari kamera IoT ESP32-CAM</span>
+                <span>Data sensor diperbarui otomatis setiap 5 detik dari perangkat IoT ESP32-CAM</span>
+            </div>
+
+            <!-- INFORMASI STATUS KAMERA -->
+            <div style="margin-top: 16px; padding: 12px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; color: #475569; display: flex; gap: 10px; align-items: flex-start; line-height: 1.5;">
+                <span style="font-size: 18px; display: inline-block; margin-top: 2px;">ℹ️</span>
+                <div>
+                    <b>Catatan Monitoring:</b> Gambar yang ditampilkan merupakan bukti visual <b>terakhir</b> yang direkam saat terjadi deteksi hama. Sementara itu, indikator <b>Status Deteksi Visual YOLO</b> dan <b>Keputusan Sistem</b> di panel samping selalu menunjukkan kondisi lapangan secara aktual (<i>real-time</i>).
+                </div>
             </div>
 
         </div>
