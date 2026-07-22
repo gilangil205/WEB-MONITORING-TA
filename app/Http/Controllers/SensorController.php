@@ -233,7 +233,7 @@ class SensorController extends Controller
             'kelembapan_tanah'    => $d['kelembapan_tanah'],
             'nilai'               => round($d['nilai_fuzzy'], 4),
             'status'              => $d['deteksi'],
-            'image'               => $d['image'] ?? null,
+            'image'               => $fotoData->first() ? asset('storage/' . $fotoData->first()->image) : null,
             'deteksi_yolo'        => $d['deteksi_yolo'] ?? null,
             'confidence_yolo'     => $d['confidence_yolo'] ?? null,
             'prediksi_sensor'     => $d['prediksi_sensor'] ?? ($d['deteksi'] ?? 'AMAN'),
