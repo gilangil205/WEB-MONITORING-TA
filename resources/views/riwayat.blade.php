@@ -155,8 +155,8 @@
             Menampilkan {{ $data->firstItem() ?? 0 }}–{{ $data->lastItem() ?? 0 }}
             dari <b>{{ $data->total() }}</b> data
         </div>
-        <div class="pagination">
-            {{ $data->appends(request()->query())->links() }}
+        <div class="pagination-wrapper" style="margin: 0;">
+            {{ $data->appends(request()->query())->links('components.pagination') }}
         </div>
     </div>
     @endif
