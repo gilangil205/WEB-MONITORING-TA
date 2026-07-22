@@ -194,9 +194,20 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
     </div>
 </div>
 
-<div class="kamera-grid">
+<style>
+.kamera-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 18px; align-items: start; margin-bottom: 18px; }
+.kamera-main-panel { grid-column: 1; grid-row: 1; margin-bottom: 0 !important; }
+.kamera-side-panel { grid-column: 2; grid-row: 1 / span 2; margin-bottom: 0 !important; }
+.kamera-riwayat-panel { grid-column: 1; grid-row: 2; margin-bottom: 0 !important; }
+@media (max-width: 900px) {
+    .kamera-layout { display: flex; flex-direction: column; gap: 16px; }
+    .kamera-main-panel, .kamera-side-panel, .kamera-riwayat-panel { grid-column: auto; grid-row: auto; margin-bottom: 0 !important; }
+}
+</style>
 
-    <div class="panel">
+<div class="kamera-layout">
+
+    <div class="panel kamera-main-panel">
         <div class="panel-header">
             <div class="panel-title">📸 Kamera Lapangan — Tanaman Jagung</div>
             <span style="font-size:11px; color:var(--abu); font-family:'JetBrains Mono',monospace;">
@@ -236,7 +247,7 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
         </div>
     </div>
 
-    <div style="display:flex; flex-direction:column; gap:16px;">
+    <div class="kamera-side-panel" style="display:flex; flex-direction:column; gap:16px;">
 
         <!-- ================== PANEL HASIL DETEKSI ================== -->
         <div class="panel">
@@ -387,9 +398,8 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
         </div>
 
     </div>
-</div>
 
-<div class="panel">
+    <div class="panel kamera-riwayat-panel">
     <div class="panel-header">
         <div class="panel-title">🖼️ Riwayat Foto Kamera (5 Terakhir)</div>
         <a href="{{ route('riwayat') }}" style="font-size:12px; color:var(--hijau); text-decoration:none; font-weight:600;">
@@ -399,6 +409,7 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
     <div class="panel-body" id="riwayat-foto-wrapper">
         <div class="foto-placeholder">📷 Memuat riwayat foto...</div>
     </div>
+</div>
 </div>
 
 <script>

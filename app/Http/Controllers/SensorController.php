@@ -641,11 +641,10 @@ class SensorController extends Controller
         $suhu_udara = $suhu;
         $udara      = $data->pluck('kelembapan_udara')->values();
         $tanah      = $data->pluck('kelembapan_tanah')->values();
-        $fuzzyChart = $data->map(fn($d) => round($this->resolveFuzzyValue($d), 3))->values();
 
         return view('dashboard', compact(
             'latest', 'data', 'nilai', 'status', 'class',
-            'labels', 'suhu', 'suhu_udara', 'udara', 'tanah', 'fuzzyChart', 'isOnline',
+            'labels', 'suhu', 'suhu_udara', 'udara', 'tanah', 'isOnline',
             'waterStatus', 'waterClass', 'waterRecommendation', 'waterTanah'
         ));
     }

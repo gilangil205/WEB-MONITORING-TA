@@ -182,20 +182,31 @@
 </form>
 
 {{-- ── GRAFIK SENSOR + ANALISIS FUZZY ── --}}
-<div class="content-grid">
-    <div class="panel">
-        <div class="panel-header">
+<style>
+.dashboard-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 12px 18px; align-items: start; margin-bottom: 18px; }
+.chart-panel { grid-column: 1; grid-row: 1; margin-bottom: 0 !important; }
+.fuzzy-panel { grid-column: 2; grid-row: 1 / span 2; margin-bottom: 0 !important; }
+.riwayat-panel { grid-column: 1; grid-row: 2; margin-bottom: 0 !important; }
+@media (max-width: 900px) {
+    .dashboard-layout { display: flex; flex-direction: column; gap: 16px; }
+    .chart-panel, .fuzzy-panel, .riwayat-panel { grid-column: auto; grid-row: auto; margin-bottom: 0 !important; }
+}
+</style>
+
+<div class="dashboard-layout">
+    <div class="panel chart-panel">
+        <div class="panel-header" style="padding-bottom: 8px;">
             <div class="panel-title">📈 Grafik Sensor (10 Data DB Terakhir)</div>
             <span style="font-size:11px;color:var(--abu);">Suhu · Udara · Tanah</span>
         </div>
-        <div class="panel-body">
-            <div class="chart-wrap">
+        <div class="panel-body" style="padding-top: 5px; padding-bottom: 12px;">
+            <div class="chart-wrap" style="height: 190px;">
                 <canvas id="chartSensor"></canvas>
             </div>
         </div>
     </div>
 
-    <div class="panel">
+    <div class="panel fuzzy-panel">
         <div class="panel-header">
             <div class="panel-title">🧮 Analisis Fuzzy Sugeno</div>
         </div>
@@ -276,25 +287,8 @@
             </div>
         </div>
     </div>
-</div>
-
-{{-- ── GRAFIK FUZZY RISIKO ── --}}
-<div class="panel" style="margin-bottom:18px;">
-    <div class="panel-header">
-        <div class="panel-title">📉 Tren Nilai Risiko Fuzzy Sugeno (10 Data DB Terakhir)</div>
-        <span style="font-size:11px;color:var(--abu);">
-            🔴 &ge;0.70 Hama &nbsp;|&nbsp; 🟡 0.45–0.70 Waspada &nbsp;|&nbsp; 🟢 &lt;0.45 Aman
-        </span>
-    </div>
-    <div class="panel-body">
-        <div class="chart-wrap">
-            <canvas id="chartFuzzy"></canvas>
-        </div>
-    </div>
-</div>
-
-{{-- ── TABEL DATA TERAKHIR ── --}}
-<div class="panel" style="margin-bottom:18px;">
+    {{-- ── TABEL DATA TERAKHIR ── --}}
+    <div class="panel riwayat-panel">
     <div class="panel-header">
         <div class="panel-title">📋 Riwayat Data Sensor (tersimpan setiap 15 menit)</div>
         <a href="{{ route('riwayat') }}" style="font-size:12px;color:var(--hijau);text-decoration:none;font-weight:600;">
@@ -345,6 +339,7 @@
         </div>
     </div>
 </div>
+</div>
 
 {{-- ── SCRIPT REAL-TIME ── --}}
 <script>
@@ -353,12 +348,10 @@
     var suhuData    = @json($suhu);
     var udaraData   = @json($udara);
     var tanahData   = @json($tanah);
-    var fuzzyData   = @json($fuzzyChart);
     var nilaiSaat   = {{ $isOnline ? $nilai : 0 }};
     var isOnlineInit = {{ $isOnline ? 'true' : 'false' }};
 
     var chartSensorInstance;
-    var chartFuzzyInstance;
 
     window.addEventListener('load', function () {
         var ptr = document.getElementById('meterPtr');
@@ -383,27 +376,7 @@
         options: { responsive: true, maintainAspectRatio: false }
     });
 
-    var ctxFuzzy = document.getElementById('chartFuzzy').getContext('2d');
-    chartFuzzyInstance = new Chart(ctxFuzzy, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Nilai Fuzzy',
-                data: fuzzyData,
-                borderColor: '#16a34a',
-                backgroundColor: 'rgba(22,163,74,0.08)',
-                borderWidth: 2.5,
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: { y: { min: 0, max: 1 } }
-        }
-    });
+
 
     var lastLiveTimestamp = null;
 
