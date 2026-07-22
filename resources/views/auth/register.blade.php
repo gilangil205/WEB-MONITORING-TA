@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login — SmartFarm</title>
+    <title>Daftar — SmartFarm</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -15,126 +15,123 @@
         }
 
         body{
-            font-family:'Segoe UI',sans-serif;
+            font-family:'Space Grotesk',sans-serif;
+            min-height:100vh;
+            display:flex;
+            background:#0f172a;
+            overflow-x:hidden;
+        }
+
+        .left-side{
+            flex:1;
             background:
-                linear-gradient(rgba(15,23,42,.88), rgba(15,23,42,.92)),
+                linear-gradient(rgba(15,23,42,0.75), rgba(15,23,42,0.9)),
                 url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?q=80&w=1600&auto=format&fit=crop');
             background-size:cover;
             background-position:center;
-            min-height:100vh;
-        }
-
-        .register-wrapper{
-            min-height:100vh;
             display:flex;
-            align-items:center;
+            flex-direction:column;
             justify-content:center;
-            padding:30px;
+            padding:60px;
+            color:white;
+            position:relative;
         }
 
-        .register-card{
-            width:100%;
-            max-width:500px;
-            background:rgba(255,255,255,0.08);
-            backdrop-filter:blur(16px);
-            border:1px solid rgba(255,255,255,0.12);
-            border-radius:24px;
-            padding:40px 35px;
-            box-shadow:0 15px 40px rgba(0,0,0,0.35);
+        .left-side::before{
+            content:'';
+            position:absolute;
+            inset:0;
+            background:linear-gradient(135deg, rgba(34,197,94,0.2), transparent);
         }
 
-        .logo-box{
-            text-align:center;
-            margin-bottom:28px;
+        .brand{
+            position:relative;
+            z-index:2;
         }
 
-        .logo-box .icon{
-            font-size:58px;
+        .brand h1{
+            font-size:52px;
+            font-weight:700;
             margin-bottom:10px;
         }
 
-        .logo-box h1{
-            color:white;
-            font-size:30px;
-            font-weight:800;
-            margin-bottom:6px;
-        }
-
-        .logo-box p{
+        .brand p{
+            font-size:18px;
             color:#cbd5e1;
-            font-size:14px;
-            line-height:1.6;
+            line-height:1.7;
+            max-width:520px;
         }
 
-        .input-group{
-            margin-bottom:18px;
+        .right-side{
+            width:470px;
+            background:white;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:40px;
+            position:relative;
+            overflow-y:auto;
         }
 
-        .input-group label{
-            display:block;
-            color:#e2e8f0;
+        .login-box{
+            width:100%;
+            max-width:360px;
+        }
+
+        .login-header{
+            margin-bottom:28px;
+        }
+
+        .login-header h2{
+            font-size:34px;
+            color:#0f172a;
             margin-bottom:8px;
+        }
+
+        .login-header p{
+            color:#64748b;
+            line-height:1.6;
+            font-size:14px;
+        }
+
+        .form-group{
+            margin-bottom:16px;
+        }
+
+        .form-group label{
+            display:block;
+            margin-bottom:6px;
             font-size:14px;
             font-weight:600;
+            color:#334155;
         }
 
-        .input-group input{
+        .form-control{
             width:100%;
-            padding:14px 16px;
-            border-radius:14px;
-            border:1px solid rgba(255,255,255,0.12);
-            background:rgba(255,255,255,0.07);
-            color:white;
+            padding:12px 16px;
+            border:1px solid #cbd5e1;
+            border-radius:12px;
             font-size:14px;
             outline:none;
-            transition:.2s;
+            transition:0.2s;
+            background:#f8fafc;
         }
 
-        .input-group input:focus{
+        .form-control:focus{
             border-color:#22c55e;
-            box-shadow:0 0 0 4px rgba(34,197,94,0.18);
-            background:rgba(255,255,255,0.1);
-        }
-
-        .input-group input::placeholder{
-            color:#94a3b8;
-        }
-
-        .error-text{
-            color:#f87171;
-            font-size:12px;
-            margin-top:6px;
-        }
-
-        .register-btn{
-            width:100%;
-            padding:14px;
-            border:none;
-            border-radius:14px;
-            background:linear-gradient(135deg,#22c55e,#15803d);
-            color:white;
-            font-size:15px;
-            font-weight:700;
-            cursor:pointer;
-            transition:.2s;
-            margin-top:8px;
-            box-shadow:0 10px 20px rgba(34,197,94,0.25);
-        }
-
-        .register-btn:hover{
-            transform:translateY(-2px);
-            box-shadow:0 15px 25px rgba(34,197,94,0.35);
+            box-shadow:0 0 0 4px rgba(34,197,94,0.15);
+            background:white;
         }
 
         .bottom-link{
-            margin-top:22px;
+            margin-top:20px;
             text-align:center;
             font-size:14px;
-            color:#cbd5e1;
+            color:#64748b;
         }
 
         .bottom-link a{
-            color:#4ade80;
+            color:#16a34a;
             text-decoration:none;
             font-weight:700;
         }
@@ -143,139 +140,154 @@
             text-decoration:underline;
         }
 
-        .iot-status{
-            margin-top:24px;
-            padding:12px;
+        .btn-login{
+            width:100%;
+            border:none;
+            background:linear-gradient(135deg,#16a34a,#15803d);
+            color:white;
+            padding:14px;
             border-radius:12px;
-            background:rgba(34,197,94,0.08);
-            border:1px solid rgba(34,197,94,0.2);
-            display:flex;
-            align-items:center;
-            gap:10px;
+            font-size:15px;
+            font-weight:700;
+            cursor:pointer;
+            transition:0.2s;
+            box-shadow:0 8px 20px rgba(22,163,74,0.25);
+            margin-top:10px;
         }
 
-        .iot-dot{
-            width:10px;
-            height:10px;
-            border-radius:50%;
-            background:#22c55e;
-            animation:blink 1s infinite;
+        .btn-login:hover{
+            transform:translateY(-2px);
+            box-shadow:0 12px 25px rgba(22,163,74,0.35);
         }
 
-        .iot-status span{
-            color:#d1fae5;
+        .error-text{
+            color:#dc2626;
             font-size:13px;
+            margin-top:6px;
         }
 
-        @keyframes blink{
-            0%,100%{opacity:1;}
-            50%{opacity:.3;}
-        }
-
-        @media(max-width:600px){
-            .register-card{
-                padding:30px 22px;
+        @media(max-width:950px){
+            .left-side{
+                display:none;
             }
 
-            .logo-box h1{
-                font-size:24px;
+            .right-side{
+                width:100%;
+                min-height:100vh;
             }
         }
     </style>
+</head>
+<body>
 
-    <div class="register-wrapper">
-        <div class="register-card">
+    <div class="left-side">
+        <div class="brand">
+            <h1>🌽 SmartFarm</h1>
+            <p>
+                Sistem monitoring hama jagung berbasis IoT dan Fuzzy Sugeno 
+                untuk membantu petani mendeteksi potensi serangan hama secara real-time.
+            </p>
+        </div>
+    </div>
 
-            <div class="logo-box">
-                <div class="icon">🌽</div>
-                <h1>SmartFarm Register</h1>
+    <div class="right-side">
+        <div class="login-box">
+
+            <div class="login-header">
+                <h2>Daftar Akun</h2>
                 <p>
-                    Buat akun petani untuk mengakses sistem monitoring hama jagung berbasis IoT & Fuzzy Sugeno.  
-                    Iya ribet dikit. Teknologi manusia emang doyan form.
+                    Buat akun petani untuk mengakses sistem monitoring SmartFarm dan deteksi hama terbaru.
                 </p>
             </div>
 
             <form method="POST" action="{{ route('register') }}">
                 @csrf
 
-                <!-- Name -->
-                <div class="input-group">
+                <!-- Nama Lengkap -->
+                <div class="form-group">
                     <label for="name">Nama Lengkap</label>
-
                     <input
                         id="name"
                         type="text"
                         name="name"
                         value="{{ old('name') }}"
-                        placeholder="Masukkan nama petani"
+                        class="form-control"
+                        placeholder="Masukkan nama lengkap"
                         required
                         autofocus
                         autocomplete="name"
                     >
-
-                    <x-input-error :messages="$errors->get('name')" class="error-text" />
+                    @error('name')
+                        <div class="error-text">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <!-- Email -->
-                <div class="input-group">
+                <div class="form-group">
                     <label for="email">Email</label>
-
                     <input
                         id="email"
                         type="email"
                         name="email"
                         value="{{ old('email') }}"
-                        placeholder="contoh@email.com"
+                        class="form-control"
+                        placeholder="Masukkan email"
                         required
                         autocomplete="username"
                     >
-
-                    <x-input-error :messages="$errors->get('email')" class="error-text" />
+                    @error('email')
+                        <div class="error-text">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <!-- Password -->
-                <div class="input-group">
+                <div class="form-group">
                     <label for="password">Password</label>
-
                     <input
                         id="password"
                         type="password"
                         name="password"
+                        class="form-control"
                         placeholder="Masukkan password"
                         required
                         autocomplete="new-password"
                     >
-
-                    <x-input-error :messages="$errors->get('password')" class="error-text" />
+                    @error('password')
+                        <div class="error-text">{{ $message }}</div>
+                    @enderror
                 </div>
 
-                <!-- Confirm Password -->
-                <div class="input-group">
+                <!-- Konfirmasi Password -->
+                <div class="form-group">
                     <label for="password_confirmation">Konfirmasi Password</label>
-
                     <input
                         id="password_confirmation"
                         type="password"
                         name="password_confirmation"
-                        placeholder="Masukkan ulang password"
+                        class="form-control"
+                        placeholder="Ulangi password"
                         required
                         autocomplete="new-password"
                     >
-
-                    <x-input-error :messages="$errors->get('password_confirmation')" class="error-text" />
+                    @error('password_confirmation')
+                        <div class="error-text">{{ $message }}</div>
+                    @enderror
                 </div>
 
-                <button type="submit" class="register-btn">
-                    🚀 Daftar Sekarang
+                <button type="submit" class="btn-login">
+                    Daftar Sekarang
                 </button>
 
                 <div class="bottom-link">
-                    Udah punya akun?
+                    Sudah memiliki akun?
                     <a href="{{ route('login') }}">
-                        Masuk di sini
+                        Masuk
                     </a>
                 </div>
             </form>
 
         </div>
     </div>
+
+</body>
+</html>

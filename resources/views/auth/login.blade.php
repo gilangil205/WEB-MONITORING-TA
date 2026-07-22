@@ -335,11 +335,11 @@
             </form>
 
             <div class="bottom-link">
-                    belum punya akun??
-                    <a href="{{ route('register') }}">
-                        Daftar di sini
-                    </a>
-                </div>
+                Belum memiliki akun?
+                <a href="{{ route('register') }}">
+                    Daftar di sini
+                </a>
+            </div>
 
         </div>
 
