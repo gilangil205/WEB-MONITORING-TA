@@ -103,8 +103,19 @@ class MQTTSubscribe extends Command
             Cache::put('iot_live_data', $cacheData, now()->addMinutes(7));
             $this->info('Cache real-time berhasil diperbarui.');
 
-            // Simpan ke Database dengan cooldown 15 menit
-            if (!Cache::has('iot_db_cooldown')) {
+            // Cek histori terakhir untuk interval 15 menit
+            $latestHistori = SensorReading::latest()->first();
+            $shouldSave = true;
+
+            if ($latestHistori) {
+                $selisihMenit = $latestHistori->created_at->diffInMinutes(now());
+                if ($selisihMenit < 15) {
+                    $shouldSave = false;
+                }
+            }
+
+            // Simpan ke Database hanya jika selisih waktu >= 15 menit
+            if ($shouldSave) {
                 $sensor = SensorReading::create([
                     'suhu'             => $suhu,
                     'kelembapan_udara' => $udara,
@@ -115,7 +126,6 @@ class MQTTSubscribe extends Command
                     'confidence_yolo'  => $inputConfidenceYolo,
                 ]);
 
-                Cache::put('iot_db_cooldown', true, now()->addMinutes(14));
                 $this->info('Data BERHASIL disimpan ke Database (Interval 15 Menit)!');
 
                 // NOTIFIKASI
@@ -131,7 +141,7 @@ class MQTTSubscribe extends Command
                     }
                 }
             } else {
-                $this->info('Penyimpanan DB dilewati (Masih dalam rentang cooldown 15 menit).');
+                $this->info('Penyimpanan DB dilewati (Belum mencapai 15 menit dari histori terakhir).');
             }
 
         }, 0);
