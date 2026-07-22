@@ -787,15 +787,17 @@ class SensorController extends Controller
     public function updateThreshold(Request $request)
     {
         $request->validate([
-            'settings.suhu_aman'     => 'required|numeric',
-            'settings.suhu_waspada'  => 'required|numeric',
-            'settings.suhu_hama'     => 'required|numeric',
-            'settings.udara_aman'    => 'required|numeric|between:0,100',
-            'settings.udara_waspada' => 'required|numeric|between:0,100',
-            'settings.udara_hama'    => 'required|numeric|between:0,100',
-            'settings.tanah_aman'    => 'required|numeric|between:0,100',
-            'settings.tanah_waspada' => 'required|numeric|between:0,100',
-            'settings.tanah_hama'    => 'required|numeric|between:0,100',
+            'settings.suhu_aman'         => 'required|numeric',
+            'settings.suhu_waspada'      => 'required|numeric',
+            'settings.suhu_hama'         => 'required|numeric',
+            'settings.udara_aman'        => 'required|numeric|between:0,100',
+            'settings.udara_waspada'     => 'required|numeric|between:0,100',
+            'settings.udara_hama'        => 'required|numeric|between:0,100',
+            'settings.tanah_aman'        => 'required|numeric|between:0,100',
+            'settings.tanah_waspada'     => 'required|numeric|between:0,100',
+            'settings.tanah_hama'        => 'required|numeric|between:0,100',
+            'settings.threshold_hama'    => 'required|numeric|between:0.01,0.99',
+            'settings.threshold_waspada' => 'required|numeric|between:0.01,0.99',
         ]);
 
         $s = $request->input('settings');
@@ -821,6 +823,15 @@ class SensorController extends Controller
             }
         }
 
+        if (isset($s['threshold_waspada']) && isset($s['threshold_hama'])) {
+            $tw = (float) $s['threshold_waspada'];
+            $th = (float) $s['threshold_hama'];
+            if ($tw >= $th) {
+                return back()->withInput()
+                    ->with('error', '❌ Threshold WASPADA harus lebih kecil dari threshold HAMA.');
+            }
+        }
+
         foreach ($s as $key => $value) {
             ThresholdSetting::where('key', $key)->update(['value' => (float) $value]);
         }
@@ -834,9 +845,10 @@ class SensorController extends Controller
     public function resetThreshold()
     {
         $defaults = [
-            'suhu_aman'     => 22, 'suhu_waspada'  => 28, 'suhu_hama'     => 32,
-            'udara_aman'    => 60, 'udara_waspada' => 75, 'udara_hama'    => 85,
-            'tanah_aman'    => 55, 'tanah_waspada' => 68, 'tanah_hama'    => 80,
+            'suhu_aman'         => 22,   'suhu_waspada'      => 28,   'suhu_hama'         => 32,
+            'udara_aman'        => 60,   'udara_waspada'     => 75,   'udara_hama'        => 85,
+            'tanah_aman'        => 55,   'tanah_waspada'     => 68,   'tanah_hama'        => 80,
+            'threshold_hama'    => 0.70, 'threshold_waspada' => 0.45,
         ];
 
         foreach ($defaults as $key => $value) {
@@ -855,18 +867,18 @@ class SensorController extends Controller
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|max:255|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
-            'role'     => 'required|in:user,admin',
+            'role'     => 'required|in:user',
         ]);
 
         User::create([
             'name'     => $request->name,
             'email'    => $request->email,
             'password' => $request->password,
-            'role'     => $request->role,
+            'role'     => 'user',
         ]);
 
         return redirect()->route('admin.dashboard')
-            ->with('success', '✅ Pengguna baru berhasil ditambahkan.');
+            ->with('success', '✅ Pengguna baru (Petani) berhasil ditambahkan.');
     }
 
     public function deleteUser(User $user)

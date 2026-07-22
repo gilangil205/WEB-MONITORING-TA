@@ -26,16 +26,17 @@
 .param-unit { font-size:11px; color:var(--abu); font-family:var(--mono); }
 
 /* ── Zone grid ── */
-.zone-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px; }
-.zone-col { display:flex; flex-direction:column; gap:5px; }
-.zone-label { font-size:11px; font-weight:600; display:flex; align-items:center; gap:5px; }
+.zone-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px; }
+.zone-col { display:flex; flex-direction:column; }
+.zone-label { font-size:11px; font-weight:600; display:flex; align-items:center; gap:5px; min-height:22px; margin-bottom:6px; }
 .lbl-ok   { color:#3B6D11; }
 .lbl-warn { color:#854F0B; }
 .lbl-err  { color:#A32D2D; }
 .zone-input {
-    width:100%; padding:8px 10px; border-radius:8px;
+    width:100%; height:38px; padding:8px 10px; border-radius:8px;
     font-size:13px; font-weight:600; font-family:var(--mono); color:var(--teks);
     background:#fafafa; outline:none; transition:border-color .15s, box-shadow .15s;
+    box-sizing:border-box;
 }
 .inp-ok   { border:1.5px solid #97C459; }
 .inp-ok:focus   { border-color:#3B6D11; box-shadow:0 0 0 3px rgba(59,109,17,.1); }
@@ -43,7 +44,7 @@
 .inp-warn:focus { border-color:#854F0B; box-shadow:0 0 0 3px rgba(133,79,11,.1); }
 .inp-err  { border:1.5px solid #F09595; }
 .inp-err:focus  { border-color:#A32D2D; box-shadow:0 0 0 3px rgba(163,45,45,.1); }
-.zone-hint { font-size:10px; color:var(--abu); }
+.zone-hint { font-size:10px; color:var(--abu); min-height:26px; line-height:1.3; margin-top:4px; }
 
 /* ── Bar ── */
 .bar-track { height:8px; border-radius:99px; background:#f1f5f9; position:relative; overflow:hidden; margin:10px 0 3px; }
@@ -429,114 +430,118 @@
         </form>
     </div>
 
-    {{-- KANAN: Pengguna (tetap di sisi kanan pada tab threshold) --}}
-    <div>
-        <div class="panel" style="margin-bottom:16px;">
-            <div class="panel-header">
-                <div class="panel-title">👥 Tambah pengguna</div>
-            </div>
-            <div class="panel-body">
-                <form action="{{ route('admin.users.store') }}" method="POST">
-                    @csrf
-                    <div class="form-group">
-                        <span class="form-label-text">Nama lengkap</span>
-                        <input type="text" name="name" value="{{ old('name') }}"
-                            placeholder="cth. Budi Santoso" class="form-input" autocomplete="off">
-                        @error('name')<p class="field-error">{{ $message }}</p>@enderror
-                    </div>
-                    <div class="form-group">
-                        <span class="form-label-text">Email</span>
-                        <input type="email" name="email" value="{{ old('email') }}"
-                            placeholder="cth. budi@kebun.id" class="form-input" autocomplete="off">
-                        @error('email')<p class="field-error">{{ $message }}</p>@enderror
-                    </div>
-                    <div class="form-group">
-                        <span class="form-label-text">Password</span>
-                        <div class="password-wrap">
-                            <input type="password" name="password" id="pw1"
-                                placeholder="Min. 8 karakter" class="form-input">
-                            <button type="button" class="toggle-pw" onclick="togglePw('pw1')">
-                                <i data-feather="eye" style="width:13px;height:13px;"></i>
-                            </button>
+    {{-- KANAN: Pengguna --}}
+    <div id="users-desktop-col">
+        <div id="users-section">
+            <div class="panel" style="margin-bottom:16px;">
+                <div class="panel-header">
+                    <div class="panel-title">👥 Tambah pengguna baru</div>
+                </div>
+                <div class="panel-body">
+                    <form action="{{ route('admin.users.store') }}" method="POST">
+                        @csrf
+                        <div class="form-group">
+                            <span class="form-label-text">Nama lengkap</span>
+                            <input type="text" name="name" value="{{ old('name') }}"
+                                placeholder="cth. Budi Santoso" class="form-input" autocomplete="off">
+                            @error('name')<p class="field-error">{{ $message }}</p>@enderror
                         </div>
-                        @error('password')<p class="field-error">{{ $message }}</p>@enderror
-                    </div>
-                    <div class="form-group">
-                        <span class="form-label-text">Konfirmasi password</span>
-                        <div class="password-wrap">
-                            <input type="password" name="password_confirmation" id="pw2"
-                                placeholder="Ulangi password" class="form-input">
-                            <button type="button" class="toggle-pw" onclick="togglePw('pw2')">
-                                <i data-feather="eye" style="width:13px;height:13px;"></i>
-                            </button>
+                        <div class="form-group">
+                            <span class="form-label-text">Email</span>
+                            <input type="email" name="email" value="{{ old('email') }}"
+                                placeholder="cth. budi@kebun.id" class="form-input" autocomplete="off">
+                            @error('email')<p class="field-error">{{ $message }}</p>@enderror
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <span class="form-label-text">Role</span>
-                        <select name="role" class="form-input" style="cursor:pointer;">
-                            <option value="user"  {{ old('role') === 'user'  ? 'selected' : '' }}>👤 User (petani)</option>
-                            <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>⚙️ Administrator</option>
-                        </select>
-                        @error('role')<p class="field-error">{{ $message }}</p>@enderror
-                    </div>
-                    <button type="submit" class="btn-add">
-                        <i data-feather="user-plus" style="width:13px;height:13px;"></i> Tambah pengguna
-                    </button>
-                </form>
+                        <div class="form-group">
+                            <span class="form-label-text">Password</span>
+                            <div class="password-wrap">
+                                <input type="password" name="password" id="pw1"
+                                    placeholder="Min. 8 karakter" class="form-input">
+                                <button type="button" class="toggle-pw" onclick="togglePw('pw1')">
+                                    <i data-feather="eye" style="width:13px;height:13px;"></i>
+                                </button>
+                            </div>
+                            @error('password')<p class="field-error">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="form-group">
+                            <span class="form-label-text">Konfirmasi password</span>
+                            <div class="password-wrap">
+                                <input type="password" name="password_confirmation" id="pw2"
+                                    placeholder="Ulangi password" class="form-input">
+                                <button type="button" class="toggle-pw" onclick="togglePw('pw2')">
+                                    <i data-feather="eye" style="width:13px;height:13px;"></i>
+                                </button>
+                            </div>
+                            @error('password_confirmation')<p class="field-error">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="form-group">
+                            <span class="form-label-text">Role Pengguna</span>
+                            <div style="display:flex; align-items:center; gap:8px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:8px; padding:9px 12px; font-size:13px; font-weight:600; color:#166534;">
+                                <span>👤 User (Petani)</span>
+                                <span style="font-size:10px; background:#dcfce7; color:#166534; padding:2px 8px; border-radius:99px; font-weight:700; margin-left:auto;">Default & Mutlak</span>
+                            </div>
+                            <input type="hidden" name="role" value="user">
+                            @error('role')<p class="field-error">{{ $message }}</p>@enderror
+                        </div>
+                        <button type="submit" class="btn-add">
+                            <i data-feather="user-plus" style="width:13px;height:13px;"></i> Tambah pengguna (Petani)
+                        </button>
+                    </form>
+                </div>
             </div>
-        </div>
 
-        <div class="panel">
-            <div class="panel-header">
-                <div class="panel-title">Daftar pengguna ({{ $users->count() }})</div>
-            </div>
-            <div style="overflow-x:auto;">
-                <table class="tabel-data">
-                    <thead>
-                        <tr>
-                            <th>Nama</th>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th style="text-align:center;">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($users as $u)
-                        <tr>
-                            <td style="font-weight:600;font-size:13px;">
-                                {{ $u->name }}
-                                @if($u->id === auth()->id())
-                                    <span style="font-size:10px;background:#dbeafe;color:#1e40af;
-                                        padding:1px 6px;border-radius:4px;margin-left:4px;font-weight:700;">ANDA</span>
-                                @endif
-                            </td>
-                            <td style="font-size:11px;color:var(--abu);font-family:var(--mono);">{{ $u->email }}</td>
-                            <td>
-                                <span class="role-badge {{ $u->role === 'admin' ? 'role-admin' : 'role-user' }}">
-                                    {{ $u->role === 'admin' ? 'Admin' : 'User' }}
-                                </span>
-                            </td>
-                            <td style="text-align:center;">
-                                @if($u->id !== auth()->id())
-                                    <form action="{{ route('admin.users.delete', $u) }}" method="POST"
-                                          onsubmit="return confirm('Hapus pengguna {{ $u->name }}?')">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" class="btn-del">
-                                            <i data-feather="trash-2" style="width:11px;height:11px;"></i> Hapus
-                                        </button>
-                                    </form>
-                                @else
-                                    <span style="font-size:11px;color:var(--abu);">—</span>
-                                @endif
-                            </td>
-                        </tr>
-                        @empty
-                        <tr><td colspan="4" style="text-align:center;color:var(--abu);padding:20px;">
-                            Belum ada pengguna terdaftar.
-                        </td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Daftar pengguna ({{ $users->count() }})</div>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="tabel-data">
+                        <thead>
+                            <tr>
+                                <th>Nama</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th style="text-align:center;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($users as $u)
+                            <tr>
+                                <td style="font-weight:600;font-size:13px;">
+                                    {{ $u->name }}
+                                    @if($u->id === auth()->id())
+                                        <span style="font-size:10px;background:#dbeafe;color:#1e40af;
+                                            padding:1px 6px;border-radius:4px;margin-left:4px;font-weight:700;">ANDA</span>
+                                    @endif
+                                </td>
+                                <td style="font-size:11px;color:var(--abu);font-family:var(--mono);">{{ $u->email }}</td>
+                                <td>
+                                    <span class="role-badge {{ $u->role === 'admin' ? 'role-admin' : 'role-user' }}">
+                                        {{ $u->role === 'admin' ? 'Admin' : 'User' }}
+                                    </span>
+                                </td>
+                                <td style="text-align:center;">
+                                    @if($u->id !== auth()->id())
+                                        <form action="{{ route('admin.users.delete', $u) }}" method="POST"
+                                              onsubmit="return confirm('Hapus pengguna {{ $u->name }}?')">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn-del">
+                                                <i data-feather="trash-2" style="width:11px;height:11px;"></i> Hapus
+                                            </button>
+                                        </form>
+                                    @else
+                                        <span style="font-size:11px;color:var(--abu);">—</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="4" style="text-align:center;color:var(--abu);padding:20px;">
+                                Belum ada pengguna terdaftar.
+                            </td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -545,20 +550,31 @@
 </div>
 
 {{-- ============================================================ --}}
-{{-- TAB: USERS (standalone, untuk mobile)                        --}}
+{{-- TAB: USERS (fokus penuh saat tab Pengguna aktif)            --}}
 {{-- ============================================================ --}}
 <div id="tab-users" style="display:none;">
-    <p style="font-size:13px;color:var(--abu);text-align:center;padding:24px;">
-        Gunakan kolom kanan pada tab "Konfigurasi threshold" untuk manajemen pengguna.
-    </p>
+    <div id="users-tab-content"></div>
 </div>
 
 <script>
 function switchTab(name, el) {
     document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
-    document.getElementById('tab-threshold').style.display = name === 'threshold' ? '' : 'none';
-    document.getElementById('tab-users').style.display     = name === 'users'     ? '' : 'none';
+    var tabTh = document.getElementById('tab-threshold');
+    var tabUs = document.getElementById('tab-users');
+    var userSec = document.getElementById('users-section');
+    var deskCol = document.getElementById('users-desktop-col');
+    var tabContent = document.getElementById('users-tab-content');
+
+    if (name === 'threshold') {
+        tabTh.style.display = '';
+        tabUs.style.display = 'none';
+        if (deskCol && userSec) deskCol.appendChild(userSec);
+    } else if (name === 'users') {
+        tabTh.style.display = 'none';
+        tabUs.style.display = '';
+        if (tabContent && userSec) tabContent.appendChild(userSec);
+    }
 }
 
 function togglePw(id) {
