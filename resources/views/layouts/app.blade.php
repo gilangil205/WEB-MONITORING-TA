@@ -133,6 +133,7 @@
         .content-grid  { display:grid; grid-template-columns:2fr 1fr; gap:18px; margin-bottom:18px; }
         .kamera-grid   { display:grid; grid-template-columns:3fr 2fr; gap:18px; margin-bottom:18px; }
         .grid-prediksi { display:grid; grid-template-columns:2fr 1fr; gap:20px; margin-bottom:20px; }
+        .top-status-grid { display:grid; grid-template-columns:1fr 1fr; }
 
         /* ── ANALISIS ── */
         .analisis-item { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f8fafc; font-size:13px; }
@@ -289,6 +290,7 @@
             .content-grid { grid-template-columns:1fr; }
             .kamera-grid  { grid-template-columns:1fr; }
             .grid-prediksi{ grid-template-columns:1fr; }
+            .top-status-grid { grid-template-columns:1fr !important; }
         }
 
         /* ── TOPBAR MOBILE (hamburger) — sembunyi di desktop ── */
@@ -423,12 +425,14 @@
             $badgeColor = match($statusGlobal ?? 'AMAN') {
                 'HAMA'    => '#dc2626',
                 'WASPADA' => '#d97706',
+                'OFFLINE' => '#64748b',
                 default   => '#16a34a',
             };
+            $displayStatus = ($statusGlobal === 'OFFLINE') ? 'ALAT OFFLINE' : ($statusGlobal ?? 'AMAN');
         @endphp
         <span style="display:inline-block; padding:4px 12px; background:{{ $badgeColor }};
                      color:white; border-radius:6px; font-size:12px; font-weight:700;">
-            {{ $statusGlobal ?? 'AMAN' }}
+            {{ $displayStatus }}
         </span>
     </div>
 </div>

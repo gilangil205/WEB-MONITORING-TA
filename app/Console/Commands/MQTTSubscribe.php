@@ -9,6 +9,8 @@ use App\Models\SensorReading;
 use App\Models\ThresholdSetting;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\SensorController;
+use App\Models\Notification;
 
 class MQTTSubscribe extends Command
 {
@@ -56,16 +58,29 @@ class MQTTSubscribe extends Command
             $udara = $data['kelembapan_udara']  ?? 0;
             $tanah = $data['kelembapan_tanah']  ?? 0;
 
-            // ✅ PERBAIKAN: Hitung fuzzy di server (bukan pakai nilai dari ESP32)
-            // Sebelumnya: $nilai_fuzzy = $data['nilai_fuzzy'] ?? 0;
-            //             $deteksi     = strtoupper($data['status'] ?? 'AMAN');
-            // Sekarang   : semua dihitung ulang di Laravel dengan parameter DB terkini
+            // ✅ PERBAIKAN: Hitung fuzzy di server
             $nilai_fuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);
             [$deteksi]   = $this->getStatus($nilai_fuzzy);
 
+            // ── BACA CACHE YOLO (Integrasi Decision Rule) ──
+            $inputDeteksiYolo = null;
+            $inputConfidenceYolo = null;
+            $hasilDeteksiYolo = 'OFF';
+            
+            if (Cache::has('yolo_live_data')) {
+                $yolo = Cache::get('yolo_live_data');
+                $inputDeteksiYolo = $yolo['deteksi_yolo'] ?? null;
+                $inputConfidenceYolo = $yolo['confidence_yolo'] ?? null;
+                $hasilDeteksiYolo = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
+            }
+
+            // Keputusan Sistem
+            $controller = app(\App\Http\Controllers\SensorController::class);
+            $keputusanSistem = $controller->getSystemDecision($hasilDeteksiYolo, $deteksi);
+
             $this->info(sprintf(
                 'Fuzzy server-side → suhu:%.1f udara:%.1f tanah:%.1f → nilai:%.4f status:%s',
-                $suhu, $udara, $tanah, $nilai_fuzzy, $deteksi
+                $suhu, $udara, $tanah, $nilai_fuzzy, $keputusanSistem
             ));
 
             // Susun data untuk Cache live monitoring
@@ -74,7 +89,12 @@ class MQTTSubscribe extends Command
                 'kelembapan_udara' => $udara,
                 'kelembapan_tanah' => $tanah,
                 'nilai_fuzzy'      => round($nilai_fuzzy, 4),
-                'deteksi'          => $deteksi,
+                'deteksi'          => $keputusanSistem,
+                'deteksi_yolo'     => $inputDeteksiYolo,
+                'confidence_yolo'  => $inputConfidenceYolo,
+                'prediksi_sensor'  => $deteksi,
+                'hasil_deteksi_yolo' => $hasilDeteksiYolo,
+                'keputusan_sistem' => $keputusanSistem,
                 'image'            => null,
                 'updated_at'       => now()->toIso8601String(),
             ];
@@ -85,16 +105,31 @@ class MQTTSubscribe extends Command
 
             // Simpan ke Database dengan cooldown 15 menit
             if (!Cache::has('iot_db_cooldown')) {
-                SensorReading::create([
+                $sensor = SensorReading::create([
                     'suhu'             => $suhu,
                     'kelembapan_udara' => $udara,
                     'kelembapan_tanah' => $tanah,
                     'nilai_fuzzy'      => $nilai_fuzzy,
-                    'deteksi'          => $deteksi,
+                    'deteksi'          => $keputusanSistem,
+                    'deteksi_yolo'     => $inputDeteksiYolo,
+                    'confidence_yolo'  => $inputConfidenceYolo,
                 ]);
 
                 Cache::put('iot_db_cooldown', true, now()->addMinutes(14));
                 $this->info('Data BERHASIL disimpan ke Database (Interval 15 Menit)!');
+
+                // NOTIFIKASI
+                if (in_array($keputusanSistem, ['HAMA', 'WASPADA'])) {
+                    $lastNotif = Notification::where('status', $keputusanSistem)
+                                             ->where('created_at', '>=', now()->subMinutes(15))
+                                             ->first();
+
+                    if (!$lastNotif) {
+                        $controller = app(SensorController::class);
+                        $controller->createNotification($keputusanSistem, round($nilai_fuzzy, 4), $sensor);
+                        $this->info("Notifikasi {$keputusanSistem} dikirim!");
+                    }
+                }
             } else {
                 $this->info('Penyimpanan DB dilewati (Masih dalam rentang cooldown 15 menit).');
             }

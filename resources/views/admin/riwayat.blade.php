@@ -127,8 +127,8 @@
                 <th>Udara</th>
                 <th>Tanah</th>
                 <th>Nilai Fuzzy</th>
-                <th>Status</th>
-                <th>Hasil YOLO</th>
+                <th>Keputusan Sistem</th>
+                <th>Hasil Deteksi YOLO</th>
                 <th>Confidence</th>
                 <th>Gambar</th>
                 <th style="text-align:center;">Aksi</th>
@@ -164,8 +164,8 @@
 
                 <td>
                     @if($item->deteksi_yolo)
-                        <span class="{{ $item->deteksi_yolo == 'Tikus Terdeteksi' ? 'status-high' : 'status-low' }}">
-                            {{ $item->deteksi_yolo }}
+                        <span class="{{ strtoupper($item->deteksi_yolo) == 'ON' ? 'status-high' : 'status-low' }}">
+                            {{ strtoupper($item->deteksi_yolo) == 'ON' ? 'ON - TIKUS TERDETEKSI' : 'OFF - TIDAK ADA TIKUS' }}
                         </span>
                     @else
                         <span style="color:#cbd5e1; font-size:12px;">Tidak ada</span>
@@ -239,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (btnDeleteAll) {
         const deleteAllUrl = @json(route('admin.riwayat.delete-all'));
-        console.log('🔗 Delete All URL:', deleteAllUrl);
+        
 
         btnDeleteAll.addEventListener('click', function(e) {
             e.preventDefault();
@@ -266,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response.json();
             })
             .then(data => {
-                console.log('✅ Response:', data);
+                
                 if (data.success) {
                     alert('✅ ' + data.message);
                     location.reload();

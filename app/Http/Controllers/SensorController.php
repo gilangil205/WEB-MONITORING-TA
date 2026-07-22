@@ -35,8 +35,20 @@ class SensorController extends Controller
     // ================== HELPER: STATUS GLOBAL ==================
     private function getStatusGlobal()
     {
-        $latest       = SensorReading::latest()->first();
-        return $latest->deteksi ?? 'AMAN';
+        if (\Illuminate\Support\Facades\Cache::has('iot_live_data')) {
+            $cache = \Illuminate\Support\Facades\Cache::get('iot_live_data');
+            
+            if (\Illuminate\Support\Facades\Cache::has('yolo_live_data')) {
+                $yolo = \Illuminate\Support\Facades\Cache::get('yolo_live_data');
+                $hasilDeteksiYolo = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
+                $prediksiSensor = $cache['prediksi_sensor'] ?? 'AMAN';
+                return $this->getSystemDecision($hasilDeteksiYolo, $prediksiSensor);
+            }
+            
+            return $cache['keputusan_sistem'] ?? ($cache['deteksi'] ?? 'AMAN');
+        }
+        
+        return 'OFFLINE';
     }
 
     // ================== HELPER: STATUS AIR ==================
@@ -91,7 +103,7 @@ class SensorController extends Controller
     }
 
     // ================== HELPER: BUAT NOTIFIKASI ==================
-    private function createNotification(string $status, float $nilai, ?SensorReading $sensor = null)
+    public function createNotification(string $status, float $nilai, ?SensorReading $sensor = null)
     {
         $users = User::whereIn('role', ['user', 'admin'])->get();
 
@@ -133,11 +145,7 @@ class SensorController extends Controller
                 $d['hasil_deteksi_yolo'] = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
                 
                 // Kalkulasi ulang Keputusan Sistem jika YOLO aktif
-                if ($d['hasil_deteksi_yolo'] === 'ON' || ($d['prediksi_sensor'] ?? 'AMAN') === 'HAMA') {
-                    $d['keputusan_sistem'] = 'HAMA';
-                } else {
-                    $d['keputusan_sistem'] = $d['prediksi_sensor'] ?? 'AMAN';
-                }
+                $d['keputusan_sistem'] = $this->getSystemDecision($d['hasil_deteksi_yolo'], $d['prediksi_sensor'] ?? 'AMAN');
                 $d['deteksi'] = $d['keputusan_sistem'];
             }
 
@@ -206,11 +214,7 @@ class SensorController extends Controller
                 $d['hasil_deteksi_yolo'] = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
                 
                 // Kalkulasi ulang Keputusan Sistem
-                if ($d['hasil_deteksi_yolo'] === 'ON' || ($d['prediksi_sensor'] ?? 'AMAN') === 'HAMA') {
-                    $d['keputusan_sistem'] = 'HAMA';
-                } else {
-                    $d['keputusan_sistem'] = $d['prediksi_sensor'] ?? 'AMAN';
-                }
+                $d['keputusan_sistem'] = $this->getSystemDecision($d['hasil_deteksi_yolo'], $d['prediksi_sensor'] ?? 'AMAN');
                 $d['deteksi'] = $d['keputusan_sistem'];
             }
         } else {
@@ -378,11 +382,7 @@ class SensorController extends Controller
         $hasilDeteksiYolo = ($yoloInput === 'ON') ? 'ON' : 'OFF';
 
         // 3. Keputusan Sistem (Sesuai Tabel Decision Rule)
-        if ($hasilDeteksiYolo === 'ON' || $prediksiSensor === 'HAMA') {
-            $keputusanSistem = 'HAMA';
-        } else {
-            $keputusanSistem = $prediksiSensor; // 'AMAN' atau 'WASPADA'
-        }
+        $keputusanSistem = $this->getSystemDecision($hasilDeteksiYolo, $prediksiSensor);
 
         $newData = [
             'suhu'             => $suhu,
@@ -577,6 +577,15 @@ class SensorController extends Controller
         return                    ['AMAN',    'status-low'];
     }
 
+    // ================== HELPER: DECISION RULE (Single Source of Truth) ==================
+    public function getSystemDecision(string $hasilDeteksiYolo, string $prediksiSensor): string
+    {
+        if (strtoupper(trim($hasilDeteksiYolo)) === 'ON' || strtoupper(trim($prediksiSensor)) === 'HAMA') {
+            return 'HAMA';
+        }
+        return $prediksiSensor;
+    }
+
     // ================== DASHBOARD ==================
     public function index()
     {
@@ -586,8 +595,10 @@ class SensorController extends Controller
         $isOnline = Cache::has('iot_live_data');
         $data     = SensorReading::latest()->take(10)->get()->reverse()->values();
         $latest   = SensorReading::latest()->first();
-        $nilai    = $latest ? $this->resolveFuzzyValue($latest) : 0;
-        [$status, $class] = $this->getStatus($nilai);
+        
+        $nilai = $latest->nilai_fuzzy ?? 0;
+        $status = $latest->deteksi ?? 'AMAN'; 
+        [$statusFuzzy, $class] = $this->getStatus($nilai);
 
         $waterStatus = '✅ CUKUP';
         $waterClass = 'status-good';
@@ -597,7 +608,16 @@ class SensorController extends Controller
         if ($isOnline) {
             $cache = Cache::get('iot_live_data');
             $nilai = $cache['nilai_fuzzy'] ?? $nilai;
-            [$status, $class] = $this->getStatus($nilai);
+            $status = $cache['keputusan_sistem'] ?? ($cache['deteksi'] ?? $status);
+            [$statusFuzzy, $class] = $this->getStatus($nilai);
+
+            if (Cache::has('yolo_live_data')) {
+                $yolo = Cache::get('yolo_live_data');
+                $hasilDeteksiYolo = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
+                $prediksiSensor = $cache['prediksi_sensor'] ?? 'AMAN';
+                
+                $status = $this->getSystemDecision($hasilDeteksiYolo, $prediksiSensor);
+            }
 
             $suhu  = $cache['suhu'] ?? 0;
             $udara = $cache['kelembapan_udara'] ?? 0;
@@ -716,7 +736,15 @@ class SensorController extends Controller
         if ($isOnline) {
             $cache  = Cache::get('iot_live_data');
             $nilai  = $cache['nilai_fuzzy'];
-            [$status, $class] = $this->getStatus($nilai);
+            $status = $cache['keputusan_sistem'] ?? $cache['deteksi'] ?? 'AMAN';
+            [$statusFuzzy, $class] = $this->getStatus($nilai);
+
+            if (Cache::has('yolo_live_data')) {
+                $yolo = Cache::get('yolo_live_data');
+                $hasilDeteksiYolo = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
+                $prediksiSensor = $cache['prediksi_sensor'] ?? 'AMAN';
+                $status = $this->getSystemDecision($hasilDeteksiYolo, $prediksiSensor);
+            }
 
             $latest = SensorReading::whereNotNull('image')->latest()->first();
 
@@ -732,8 +760,9 @@ class SensorController extends Controller
             }
         } else {
             $latest = SensorReading::whereNotNull('image')->latest()->first();
-            $nilai  = $latest ? $this->resolveFuzzyValue($latest) : 0;
-            [$status, $class] = $this->getStatus($nilai);
+            $nilai  = $latest->nilai_fuzzy ?? 0;
+            $status = $latest->deteksi ?? 'AMAN';
+            [$statusFuzzy, $class] = $this->getStatus($nilai);
         }
 
         return view('kamera', compact('latest', 'nilai', 'status', 'class', 'isOnline'));

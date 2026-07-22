@@ -21,6 +21,10 @@
     </div>
 </div>
 
+<div style="background:#eff6ff; border-left:4px solid #3b82f6; color:#1e3a8a; padding:12px 16px; border-radius:8px; margin-bottom:20px; font-size:13px; font-weight:500;">
+    ℹ️ <b>Perhatian:</b> Halaman ini difokuskan pada <b>Prediksi Sensor (Fuzzy Sugeno)</b> berdasarkan tren iklim mikro. Hasil di bawah ini <b>bukan</b> Keputusan Sistem Akhir karena tidak melibatkan deteksi visual kamera (YOLO).
+</div>
+
 {{-- ── KARTU DATA LIVE (dari Cache IoT) ── --}}
 <div class="card-box">
 
@@ -54,7 +58,7 @@
         @elseif($status=='WASPADA') status-medium
         @else status-low
         @endif">
-        <h4>⚠️ Status Saat Ini</h4>
+        <h4>⚠️ Prediksi Sensor (Fuzzy)</h4>
         <p id="pred-status-text">{{ $isOnline ? $status : 'OFFLINE' }}</p>
         <small>Nilai Fuzzy: <span id="pred-fuzzy-val">{{ $isOnline ? number_format($nilai, 3) : '--' }}</span></small>
     </div>

@@ -24,7 +24,7 @@
 </div>
 
 {{-- ── 2 KOTAK STATUS (KESEHATAN TANAH & STATUS PREDIKSI HAMA) ── --}}
-<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+<div class="top-status-grid" style="gap:16px; margin-bottom:20px;">
     
     {{-- Kotak 1: Kesehatan Tanah --}}
     <div id="live-water-card" class="panel" style="border-left:4px solid 
@@ -95,7 +95,7 @@
                         @if(!$isOnline)
                             OFFLINE
                         @else
-                            {{ $status }} | {{ number_format($nilai, 3) }}
+                            Keputusan Akhir: {{ $status }}
                         @endif
                     </span>
                 </div>
@@ -473,17 +473,17 @@
                     if (statusCard)  statusCard.style.borderLeftColor = '#dc2626';
                     if (statusIcon)  statusIcon.innerText  = '🚨';
                     if (statusText)  statusText.innerText  = 'Terdeteksi!';
-                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-hama'; statusBadge.innerText = 'HAMA | ' + nilaiFuzzy.toFixed(3); }
+                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-hama'; statusBadge.innerText = 'Keputusan Akhir: HAMA'; }
                 } else if (statusHama === 'WASPADA') {
                     if (statusCard)  statusCard.style.borderLeftColor = '#f59e0b';
                     if (statusIcon)  statusIcon.innerText  = '⚠️';
                     if (statusText)  statusText.innerText  = 'Waspada';
-                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-waspada'; statusBadge.innerText = 'WASPADA | ' + nilaiFuzzy.toFixed(3); }
+                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-waspada'; statusBadge.innerText = 'Keputusan Akhir: WASPADA'; }
                 } else {
                     if (statusCard)  statusCard.style.borderLeftColor = '#22c55e';
                     if (statusIcon)  statusIcon.innerText  = '✅';
                     if (statusText)  statusText.innerText  = 'Aman';
-                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-aman'; statusBadge.innerText = 'AMAN | ' + nilaiFuzzy.toFixed(3); }
+                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-aman'; statusBadge.innerText = 'Keputusan Akhir: AMAN'; }
                 }
 
                 // Update Kesehatan Tanah card

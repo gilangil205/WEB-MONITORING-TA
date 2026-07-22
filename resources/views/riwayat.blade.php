@@ -68,8 +68,8 @@
                     <th>Udara</th>
                     <th>Tanah</th>
                     <th>Nilai Fuzzy</th>
-                    <th>Status</th>
-                    <th>Hasil YOLO</th>
+                    <th>Keputusan Sistem</th>
+                    <th>Hasil Deteksi YOLO</th>
                     <th>Confidence</th>
                     <th>Gambar</th>
                 </tr>
@@ -105,8 +105,8 @@
                     <td>
                         @if($item->deteksi_yolo)
                             <span class="
-                                {{ $item->deteksi_yolo == 'Tikus Terdeteksi' ? 'status-high' : 'status-low' }}">
-                                {{ $item->deteksi_yolo }}
+                                {{ strtoupper($item->deteksi_yolo) == 'ON' ? 'status-high' : 'status-low' }}">
+                                {{ strtoupper($item->deteksi_yolo) == 'ON' ? 'ON - TIKUS TERDETEKSI' : 'OFF - TIDAK ADA TIKUS' }}
                             </span>
                         @else
                             <span style="color:#cbd5e1; font-size:12px;">Tidak ada</span>

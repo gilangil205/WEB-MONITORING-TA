@@ -14,7 +14,6 @@ class SensorReading extends Model
         'kelembapan_udara',
         'kelembapan_tanah',
         'nilai_fuzzy',
-        'nilai_hybrid',
         'image',
         'deteksi',
         'deteksi_yolo',

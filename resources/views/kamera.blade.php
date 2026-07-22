@@ -121,6 +121,11 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
     .kamera-grid { grid-template-columns:1fr; }
 }
 
+@media (max-width:560px) {
+    .mini-grid   { grid-template-columns:1fr !important; }
+    .foto-grid   { grid-template-columns:repeat(2,1fr); }
+}
+
 </style>
 
 <div class="page-header">
@@ -290,11 +295,11 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
                         @if(!$isOnline)
                             Perangkat IoT sedang tidak terhubung. Periksa koneksi jaringan ESP32.
                         @elseif($status=='HAMA')
-                            Nilai output fuzzy &ge; 0.70. Kondisi SANGAT RAWAN HAMA! Segera lakukan tindakan pengendalian.
+                            Berdasarkan Keputusan Sistem (Fuzzy + YOLO). Kondisi SANGAT RAWAN HAMA! Segera lakukan tindakan pengendalian.
                         @elseif($status=='WASPADA')
-                            Nilai output fuzzy 0.45–0.70. Kondisi mulai rawan. Tingkatkan monitoring.
+                            Berdasarkan Prediksi Sensor (Fuzzy). Kondisi mulai rawan. Tingkatkan monitoring.
                         @else
-                            Nilai output fuzzy &lt; 0.45. Kondisi aman. Lanjutkan pemeliharaan rutin.
+                            Berdasarkan Prediksi Sensor (Fuzzy) dan Visual YOLO. Kondisi aman. Lanjutkan pemeliharaan rutin.
                         @endif
                     </div>
                 </div>
@@ -499,17 +504,17 @@ function fetchLatestCameraData() {
                 if (panelBesar) panelBesar.classList.add('hama');
                 if (sbVal)  { sbVal.classList.add('hama');    sbVal.innerText = 'HAMA TERDETEKSI'; }
                 if (sbIcon)   sbIcon.innerText = '🚨';
-                if (sbDesc)   sbDesc.innerText = 'Nilai output fuzzy ≥ 0.70. Kondisi SANGAT RAWAN HAMA! Segera lakukan tindakan pengendalian.';
+                if (sbDesc)   sbDesc.innerText = 'Berdasarkan Keputusan Sistem (Fuzzy + YOLO). Kondisi SANGAT RAWAN HAMA! Segera lakukan tindakan pengendalian.';
             } else if (status === 'WASPADA') {
                 if (panelBesar) panelBesar.classList.add('waspada');
                 if (sbVal)  { sbVal.classList.add('waspada'); sbVal.innerText = 'PERLU WASPADA'; }
                 if (sbIcon)   sbIcon.innerText = '⚠️';
-                if (sbDesc)   sbDesc.innerText = 'Nilai output fuzzy 0.45–0.70. Kondisi mulai rawan. Tingkatkan monitoring.';
+                if (sbDesc)   sbDesc.innerText = 'Berdasarkan Prediksi Sensor (Fuzzy). Kondisi mulai rawan. Tingkatkan monitoring.';
             } else {
                 if (panelBesar) panelBesar.classList.add('aman');
                 if (sbVal)  { sbVal.classList.add('aman');    sbVal.innerText = 'TANAMAN AMAN'; }
                 if (sbIcon)   sbIcon.innerText = '🌿';
-                if (sbDesc)   sbDesc.innerText = 'Nilai output fuzzy < 0.45. Kondisi aman. Lanjutkan pemeliharaan rutin.';
+                if (sbDesc)   sbDesc.innerText = 'Berdasarkan Prediksi Sensor (Fuzzy) dan Visual YOLO. Kondisi aman. Lanjutkan pemeliharaan rutin.';
             }
 
             var rekList = document.getElementById('rekomendasi-list');
