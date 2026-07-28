@@ -1,14 +1,14 @@
 @extends('layouts.app')
 
-@section('title','Prediksi Serangan Hama')
+@section('title','Analisis Risiko Lingkungan dan Deteksi Hama')
 
 @section('content')
 
 {{-- ── HEADER ── --}}
 <div class="page-header">
     <div>
-        <h1>📊 Prediksi Serangan Hama</h1>
-        <p>Proyeksi risiko 3 periode ke depan berdasarkan tren data sensor — Metode Fuzzy Sugeno</p>
+        <h1>📊 Analisis Risiko Lingkungan dan Deteksi Hama</h1>
+        <p>Proyeksi tingkat risiko lingkungan 3 periode ke depan berdasarkan tren iklim mikro — Metode Fuzzy Sugeno</p>
     </div>
     <div class="update-badge">
         <span class="dot"></span>
@@ -22,7 +22,7 @@
 </div>
 
 <div style="background:#eff6ff; border-left:4px solid #3b82f6; color:#1e3a8a; padding:12px 16px; border-radius:8px; margin-bottom:20px; font-size:13px; font-weight:500;">
-    ℹ️ <b>Perhatian:</b> Halaman ini difokuskan pada <b>Prediksi Sensor (Fuzzy Sugeno)</b> berdasarkan tren iklim mikro. Hasil di bawah ini <b>bukan</b> Keputusan Sistem Akhir karena tidak melibatkan deteksi visual kamera (YOLO).
+    ℹ️ <b>Perhatian:</b> Halaman ini difokuskan pada <b>Tingkat Risiko Lingkungan (Fuzzy Sugeno)</b> berdasarkan tren iklim mikro. Hasil di bawah ini <b>bukan</b> Keputusan Sistem Akhir karena tidak melibatkan deteksi visual kamera (YOLO).
 </div>
 
 {{-- ── KARTU DATA LIVE (dari Cache IoT) ── --}}
@@ -54,12 +54,12 @@
 
     <div id="pred-status-card" class="card-item
         @if(!$isOnline) status-offline
-        @elseif($status=='HAMA') status-high
-        @elseif($status=='WASPADA') status-medium
+        @elseif($status=='TINGGI' || $status=='HAMA') status-high
+        @elseif($status=='SEDANG' || $status=='WASPADA') status-medium
         @else status-low
         @endif">
-        <h4>⚠️ Prediksi Sensor (Fuzzy)</h4>
-        <p id="pred-status-text">{{ $isOnline ? $status : 'OFFLINE' }}</p>
+        <h4>⚠️ Tingkat Risiko Lingkungan (Fuzzy Sugeno)</h4>
+        <p id="pred-status-text">{{ $isOnline ? ($status=='HAMA' ? 'TINGGI' : ($status=='WASPADA' ? 'SEDANG' : ($status=='AMAN' ? 'RENDAH' : $status))) : 'OFFLINE' }}</p>
         <small>Nilai Fuzzy: <span id="pred-fuzzy-val">{{ $isOnline ? number_format($nilai, 3) : '--' }}</span></small>
     </div>
 
@@ -85,27 +85,27 @@
 
         {{-- Status saat ini --}}
         <div id="pred-analisis-box" style="padding:12px 16px;border-radius:10px;margin-bottom:16px;
-            background:{{ !$isOnline ? '#f8fafc' : ($status=='HAMA' ? '#fee2e2' : ($status=='WASPADA' ? '#fef9c3' : '#dcfce7')) }};
-            border-left:4px solid {{ !$isOnline ? '#94a3b8' : ($status=='HAMA' ? '#ef4444' : ($status=='WASPADA' ? '#facc15' : '#22c55e')) }};">
+            background:{{ !$isOnline ? '#f8fafc' : ($status=='TINGGI'||$status=='HAMA' ? '#fee2e2' : ($status=='SEDANG'||$status=='WASPADA' ? '#fef9c3' : '#dcfce7')) }};
+            border-left:4px solid {{ !$isOnline ? '#94a3b8' : ($status=='TINGGI'||$status=='HAMA' ? '#ef4444' : ($status=='SEDANG'||$status=='WASPADA' ? '#facc15' : '#22c55e')) }};">
             @if(!$isOnline)
                 <b style="color:#64748b;">📡 Alat IoT Tidak Terhubung</b>
                 <p style="margin-top:4px;font-size:13px;color:#64748b;">
                     Perangkat IoT sedang offline. Prediksi dihitung dari data historis DB terakhir.
                 </p>
-            @elseif($status == 'HAMA')
-                <b style="color:#dc2626;">🚨 Risiko Tinggi!</b>
+            @elseif($status == 'TINGGI' || $status == 'HAMA')
+                <b style="color:#dc2626;">🚨 Risiko Lingkungan Tinggi!</b>
                 <p style="margin-top:4px;font-size:13px;color:#7f1d1d;">
-                    Kondisi saat ini sangat mendukung serangan hama. Segera lakukan pemeriksaan dan penanganan.
+                    Kondisi iklim mikro saat ini sangat mendukung potensi perkembangan hama. Disarankan melakukan pemeriksaan langsung pada lahan.
                 </p>
-            @elseif($status == 'WASPADA')
-                <b style="color:#854d0e;">⚠️ Perlu Waspada</b>
+            @elseif($status == 'SEDANG' || $status == 'WASPADA')
+                <b style="color:#854d0e;">⚠️ Risiko Lingkungan Sedang</b>
                 <p style="margin-top:4px;font-size:13px;color:#713f12;">
-                    Kondisi mulai mendukung pertumbuhan hama. Lakukan monitoring lebih sering.
+                    Kondisi lingkungan berada pada tingkat risiko sedang. Lakukan pemantauan secara berkala.
                 </p>
             @else
-                <b style="color:#166534;">✅ Kondisi Aman</b>
+                <b style="color:#166534;">✅ Risiko Lingkungan Rendah</b>
                 <p style="margin-top:4px;font-size:13px;color:#14532d;">
-                    Risiko serangan hama rendah. Tetap lakukan pemantauan rutin.
+                    Kondisi lingkungan dalam batas aman. Tetap lakukan pemantauan rutin.
                 </p>
             @endif
         </div>
@@ -123,6 +123,12 @@
             </thead>
             <tbody>
                 @foreach($prediksi as $i => $p)
+                @php
+                    $pStatus = $prediksiStatus[$i];
+                    if ($pStatus === 'HAMA') $pStatus = 'TINGGI';
+                    elseif ($pStatus === 'WASPADA') $pStatus = 'SEDANG';
+                    elseif ($pStatus === 'AMAN') $pStatus = 'RENDAH';
+                @endphp
                 <tr style="border-bottom:1px solid #f1f5f9;">
                     <td style="padding:8px 10px;">+{{ ($i+1) * 15 }} Menit</td>
                     <td style="padding:8px 10px;text-align:center;font-weight:600;">
@@ -130,11 +136,11 @@
                     </td>
                     <td style="padding:8px 10px;text-align:center;">
                         <span class="badge-status
-                            @if($prediksiStatus[$i]=='HAMA') bs-hama
-                            @elseif($prediksiStatus[$i]=='WASPADA') bs-waspada
+                            @if($pStatus=='TINGGI') bs-hama
+                            @elseif($pStatus=='SEDANG') bs-waspada
                             @else bs-aman
                             @endif">
-                            {{ $prediksiStatus[$i] }}
+                            {{ $pStatus }}
                         </span>
                     </td>
                 </tr>
@@ -142,19 +148,16 @@
             </tbody>
         </table>
 
-        {{-- ✅ PERBAIKAN: Keterangan threshold dinamis dari DB (bukan hardcode) --}}
-        {{-- Sebelumnya: 0.70 dan 0.45 ditulis langsung di HTML                 --}}
-        {{-- Sekarang  : dibaca dari variabel $thresholdHama & $thresholdWaspada --}}
         <div style="margin-top:16px;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:12px;">
             <p><b>Keterangan Threshold Fuzzy Sugeno:</b></p>
             <p style="margin-top:4px;">
-                🔴 <b>HAMA</b> &nbsp;&nbsp;: Nilai &ge; {{ number_format($thresholdHama, 2) }}
+                🔴 <b>TINGGI</b> &nbsp;&nbsp;: Nilai &ge; {{ number_format($thresholdHama, 2) }}
             </p>
             <p style="margin-top:2px;">
-                🟡 <b>WASPADA</b> : {{ number_format($thresholdWaspada, 2) }} &le; Nilai &lt; {{ number_format($thresholdHama, 2) }}
+                🟡 <b>SEDANG</b> : {{ number_format($thresholdWaspada, 2) }} &le; Nilai &lt; {{ number_format($thresholdHama, 2) }}
             </p>
             <p style="margin-top:2px;">
-                🟢 <b>AMAN</b> &nbsp;&nbsp;: Nilai &lt; {{ number_format($thresholdWaspada, 2) }}
+                🟢 <b>RENDAH</b> &nbsp;&nbsp;: Nilai &lt; {{ number_format($thresholdWaspada, 2) }}
             </p>
             <p style="margin-top:8px;color:#94a3b8;">ℹ️ Data historis tersimpan ke DB setiap 15 menit. Grafik live dari Cache IoT (setiap 5 menit).</p>
         </div>

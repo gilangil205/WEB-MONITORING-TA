@@ -29,9 +29,10 @@
             <select name="deteksi" onchange="this.form.submit()"
                 style="padding:8px 12px; border-radius:8px; border:1px solid #ddd; font-size:13px; cursor:pointer;">
                 <option value="">Semua Status</option>
-                <option value="HAMA"    {{ request('deteksi')=='HAMA'    ? 'selected':'' }}>🔴 HAMA</option>
-                <option value="WASPADA" {{ request('deteksi')=='WASPADA' ? 'selected':'' }}>🟡 WASPADA</option>
-                <option value="AMAN"    {{ request('deteksi')=='AMAN'    ? 'selected':'' }}>🟢 AMAN</option>
+                <option value="HAMA"    {{ request('deteksi')=='HAMA'    ? 'selected':'' }}>🔴 HAMA TERDETEKSI</option>
+                <option value="TINGGI"  {{ request('deteksi')=='TINGGI'  ? 'selected':'' }}>🔴 RISIKO LINGKUNGAN TINGGI</option>
+                <option value="SEDANG"  {{ request('deteksi')=='SEDANG'  ? 'selected':'' }}>🟡 RISIKO LINGKUNGAN SEDANG</option>
+                <option value="RENDAH"  {{ request('deteksi')=='RENDAH'  ? 'selected':'' }}>🟢 RISIKO LINGKUNGAN RENDAH</option>
             </select>
         </div>
 
@@ -49,9 +50,10 @@
     @if($data->total() > 0)
     <div style="background:#f8fafc; border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; gap:24px; flex-wrap:wrap; font-size:13px; color:#475569;">
         <span>📊 Total data: <b>{{ $data->total() }}</b></span>
-        <span>🔴 HAMA: <b>{{ $data->getCollection()->where('deteksi','HAMA')->count() }}</b></span>
-        <span>🟡 WASPADA: <b>{{ $data->getCollection()->where('deteksi','WASPADA')->count() }}</b></span>
-        <span>🟢 AMAN: <b>{{ $data->getCollection()->where('deteksi','AMAN')->count() }}</b></span>
+        <span>🔴 HAMA TERDETEKSI: <b>{{ $data->getCollection()->where('deteksi','HAMA')->count() }}</b></span>
+        <span>🔴 RISIKO TINGGI: <b>{{ $data->getCollection()->whereIn('deteksi',['TINGGI'])->count() }}</b></span>
+        <span>🟡 RISIKO SEDANG: <b>{{ $data->getCollection()->whereIn('deteksi',['SEDANG','WASPADA'])->count() }}</b></span>
+        <span>🟢 RISIKO RENDAH: <b>{{ $data->getCollection()->whereIn('deteksi',['RENDAH','AMAN'])->count() }}</b></span>
     </div>
     @endif
 
@@ -97,8 +99,11 @@
                     </td>
 
                     <td>
-                        <span class="{{ $item->status == 'HAMA' ? 'status-high' : ($item->status == 'WASPADA' ? 'status-medium' : 'status-low') }}">
-                            {{ $item->status }}
+                        @php
+                            $disp = \App\Http\Controllers\SensorController::formatDisplayStatus($item);
+                        @endphp
+                        <span class="{{ $disp['class'] }}">
+                            {{ $disp['label'] }}
                         </span>
                     </td>
 
@@ -106,7 +111,7 @@
                         @if($item->deteksi_yolo)
                             <span class="
                                 {{ strtoupper($item->deteksi_yolo) == 'ON' ? 'status-high' : 'status-low' }}">
-                                {{ strtoupper($item->deteksi_yolo) == 'ON' ? 'ON - TIKUS TERDETEKSI' : 'OFF - TIDAK ADA TIKUS' }}
+                                {{ strtoupper($item->deteksi_yolo) == 'ON' ? 'ON - TIKUS TERDETEKSI PADA CITRA' : 'OFF - TIKUS TIDAK TERDETEKSI PADA CITRA' }}
                             </span>
                         @else
                             <span style="color:#cbd5e1; font-size:12px;">Tidak ada</span>

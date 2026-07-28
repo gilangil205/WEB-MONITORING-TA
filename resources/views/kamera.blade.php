@@ -131,7 +131,7 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
 <div class="page-header">
     <div>
         <h1>📷 Monitoring Visual Tanaman Jagung</h1>
-        <p>Pemantauan kamera lapangan secara real-time disertai analisis deteksi hama berbasis Fuzzy Sugeno</p>
+        <p>Pemantauan visual tanaman jagung secara real-time disertai analisis risiko lingkungan menggunakan Fuzzy Sugeno dan deteksi hama menggunakan YOLO.</p>
     </div>
     <div id="header-pill">
         @if($isOnline)
@@ -179,14 +179,14 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
     <div id="mini-card-status" class="mini-card
         @if(!$isOnline) mc-status-offline
         @elseif($status=='HAMA') mc-status-hama
-        @elseif($status=='WASPADA') mc-status-waspada
+        @elseif($status=='WASPADA' || $status=='SEDANG') mc-status-waspada
         @else mc-status-aman
         @endif">
         <span class="mc-icon" id="mini-icon-status">
-            @if(!$isOnline) 📡 @elseif($status=='HAMA') 🚨 @elseif($status=='WASPADA') ⚠️ @else ✅ @endif
+            @if(!$isOnline) 📡 @elseif($status=='HAMA') 🚨 @elseif($status=='WASPADA' || $status=='SEDANG') ⚠️ @else ✅ @endif
         </span>
         <div class="mc-info">
-            <div class="mc-label">Status Hama</div>
+            <div class="mc-label">Status Sistem</div>
             <div class="mc-val" style="font-size:16px;" id="mini-val-status">
                 {{ $isOnline ? $status : 'OFFLINE' }}
             </div>
@@ -262,11 +262,11 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
                     
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         <!-- Prediksi Sensor -->
-                        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:white; border-radius:8px; border:1px solid #f1f5f9;">
+                        <div style="display:flex; justify-space-between; align-items:center; padding:10px 12px; background:white; border-radius:8px; border:1px solid #f1f5f9;">
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <span style="font-size:18px;">🧮</span>
                                 <div>
-                                    <div style="font-size:12px; font-weight:600; color:var(--teks);">Prediksi Sensor (Fuzzy)</div>
+                                    <div style="font-size:12px; font-weight:600; color:var(--teks);">Tingkat Risiko Lingkungan (Fuzzy Sugeno)</div>
                                     <div style="font-size:11px; color:var(--abu);">Skor Fuzzy: <span id="dr-fuzzy-skor" style="font-family:'JetBrains Mono',monospace; font-weight:600;">{{ $isOnline ? round($latest->nilai_fuzzy ?? 0, 4) : '--' }}</span></div>
                                 </div>
                             </div>
@@ -290,35 +290,38 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
                 <!-- STATUS BESAR -->
                 <div id="panel-status-besar" class="status-besar
                     @if(!$isOnline) offline
-                    @elseif($status=='HAMA') hama
-                    @elseif($status=='WASPADA') waspada
+                    @elseif($status=='HAMA' || $status=='TINGGI') hama
+                    @elseif($status=='SEDANG' || $status=='WASPADA') waspada
                     @else aman
                     @endif">
                     <span class="sb-icon" id="sb-icon">
-                        @if(!$isOnline) 📡 @elseif($status=='HAMA') 🚨 @elseif($status=='WASPADA') ⚠️ @else 🌿 @endif
+                        @if(!$isOnline) 📡 @elseif($status=='HAMA') 🚨 @elseif($status=='TINGGI') ⚠️ @elseif($status=='SEDANG' || $status=='WASPADA') ⚠️ @else 🌿 @endif
                     </span>
                     <div class="sb-label">Keputusan Sistem Akhir</div>
                     <div id="sb-val" class="sb-val
                         @if(!$isOnline) offline
-                        @elseif($status=='HAMA') hama
-                        @elseif($status=='WASPADA') waspada
+                        @elseif($status=='HAMA' || $status=='TINGGI') hama
+                        @elseif($status=='SEDANG' || $status=='WASPADA') waspada
                         @else aman
                         @endif">
                         @if(!$isOnline) ALAT OFFLINE
                         @elseif($status=='HAMA') HAMA TERDETEKSI
-                        @elseif($status=='WASPADA') PERLU WASPADA
-                        @else TANAMAN AMAN
+                        @elseif($status=='TINGGI') RISIKO LINGKUNGAN TINGGI
+                        @elseif($status=='SEDANG' || $status=='WASPADA') RISIKO LINGKUNGAN SEDANG
+                        @else RISIKO LINGKUNGAN RENDAH
                         @endif
                     </div>
                     <div class="sb-desc" id="sb-desc">
                         @if(!$isOnline)
                             Perangkat IoT sedang tidak terhubung. Periksa koneksi jaringan ESP32.
                         @elseif($status=='HAMA')
-                            Berdasarkan Keputusan Sistem (Fuzzy + YOLO). Kondisi SANGAT RAWAN HAMA! Segera lakukan tindakan pengendalian.
-                        @elseif($status=='WASPADA')
-                            Berdasarkan Prediksi Sensor (Fuzzy). Kondisi mulai rawan. Tingkatkan monitoring.
+                            Berdasarkan Deteksi Visual YOLO (Kamera). HAMA TIKUS TERDETEKSI PADA CITRA! Segera lakukan tindakan penanganan.
+                        @elseif($status=='TINGGI')
+                            Berdasarkan Analisis Sensor (Fuzzy Sugeno). Tingkat risiko lingkungan TINGGI. Kondisi iklim sangat kondusif bagi perkembangan hama.
+                        @elseif($status=='SEDANG' || $status=='WASPADA')
+                            Berdasarkan Analisis Sensor (Fuzzy Sugeno). Tingkat risiko lingkungan SEDANG. Lakukan pemantauan secara berkala.
                         @else
-                            Berdasarkan Prediksi Sensor (Fuzzy) dan Visual YOLO. Kondisi aman. Lanjutkan pemeliharaan rutin.
+                            Berdasarkan Analisis Sensor (Fuzzy Sugeno) dan Visual YOLO. Tingkat risiko lingkungan RENDAH. Kondisi aman.
                         @endif
                     </div>
                 </div>
@@ -482,10 +485,15 @@ function fetchLatestCameraData() {
             
             var predBadge = document.getElementById('dr-prediksi-badge');
             if (predBadge) {
-                predBadge.innerText = data.prediksi_sensor || 'AMAN';
-                if (data.prediksi_sensor === 'HAMA') {
+                var pVal = data.prediksi_sensor || 'RENDAH';
+                if (pVal === 'HAMA') pVal = 'TINGGI';
+                else if (pVal === 'WASPADA') pVal = 'SEDANG';
+                else if (pVal === 'AMAN') pVal = 'RENDAH';
+
+                predBadge.innerText = pVal;
+                if (pVal === 'TINGGI') {
                     predBadge.style.background = '#fee2e2'; predBadge.style.color = '#dc2626';
-                } else if (data.prediksi_sensor === 'WASPADA') {
+                } else if (pVal === 'SEDANG') {
                     predBadge.style.background = '#fef9c3'; predBadge.style.color = '#d97706';
                 } else {
                     predBadge.style.background = '#dcfce7'; predBadge.style.color = '#16a34a';
@@ -499,10 +507,10 @@ function fetchLatestCameraData() {
             if (yoloBadge) {
                 var yStatus = data.hasil_deteksi_yolo || 'OFF';
                 if (yStatus === 'ON') {
-                    yoloBadge.innerText = 'ON - TIKUS TERDETEKSI';
+                    yoloBadge.innerText = 'ON - TIKUS TERDETEKSI PADA CITRA';
                     yoloBadge.style.background = '#fee2e2'; yoloBadge.style.color = '#dc2626';
                 } else {
-                    yoloBadge.innerText = 'OFF - TIDAK ADA TIKUS';
+                    yoloBadge.innerText = 'OFF - TIKUS TIDAK TERDETEKSI PADA CITRA';
                     yoloBadge.style.background = '#dcfce7'; yoloBadge.style.color = '#16a34a';
                 }
             }
@@ -523,17 +531,22 @@ function fetchLatestCameraData() {
                 if (panelBesar) panelBesar.classList.add('hama');
                 if (sbVal)  { sbVal.classList.add('hama');    sbVal.innerText = 'HAMA TERDETEKSI'; }
                 if (sbIcon)   sbIcon.innerText = '🚨';
-                if (sbDesc)   sbDesc.innerText = 'Berdasarkan Keputusan Sistem (Fuzzy + YOLO). Kondisi SANGAT RAWAN HAMA! Segera lakukan tindakan pengendalian.';
-            } else if (status === 'WASPADA') {
-                if (panelBesar) panelBesar.classList.add('waspada');
-                if (sbVal)  { sbVal.classList.add('waspada'); sbVal.innerText = 'PERLU WASPADA'; }
+                if (sbDesc)   sbDesc.innerText = 'Berdasarkan Deteksi Visual YOLO (Kamera). HAMA TIKUS TERDETEKSI PADA CITRA! Segera lakukan tindakan penanganan.';
+            } else if (status === 'TINGGI') {
+                if (panelBesar) panelBesar.classList.add('hama');
+                if (sbVal)  { sbVal.classList.add('hama');    sbVal.innerText = 'RISIKO LINGKUNGAN TINGGI'; }
                 if (sbIcon)   sbIcon.innerText = '⚠️';
-                if (sbDesc)   sbDesc.innerText = 'Berdasarkan Prediksi Sensor (Fuzzy). Kondisi mulai rawan. Tingkatkan monitoring.';
+                if (sbDesc)   sbDesc.innerText = 'Berdasarkan Analisis Sensor (Fuzzy Sugeno). Tingkat risiko lingkungan TINGGI. Kondisi iklim sangat kondusif bagi perkembangan hama.';
+            } else if (status === 'SEDANG' || status === 'WASPADA') {
+                if (panelBesar) panelBesar.classList.add('waspada');
+                if (sbVal)  { sbVal.classList.add('waspada'); sbVal.innerText = 'RISIKO LINGKUNGAN SEDANG'; }
+                if (sbIcon)   sbIcon.innerText = '⚠️';
+                if (sbDesc)   sbDesc.innerText = 'Berdasarkan Analisis Sensor (Fuzzy Sugeno). Tingkat risiko lingkungan SEDANG. Lakukan pemantauan secara berkala.';
             } else {
                 if (panelBesar) panelBesar.classList.add('aman');
-                if (sbVal)  { sbVal.classList.add('aman');    sbVal.innerText = 'TANAMAN AMAN'; }
+                if (sbVal)  { sbVal.classList.add('aman');    sbVal.innerText = 'RISIKO LINGKUNGAN RENDAH'; }
                 if (sbIcon)   sbIcon.innerText = '🌿';
-                if (sbDesc)   sbDesc.innerText = 'Berdasarkan Prediksi Sensor (Fuzzy) dan Visual YOLO. Kondisi aman. Lanjutkan pemeliharaan rutin.';
+                if (sbDesc)   sbDesc.innerText = 'Berdasarkan Analisis Sensor (Fuzzy Sugeno) dan Visual YOLO. Tingkat risiko lingkungan RENDAH. Kondisi aman.';
             }
 
             var rekList = document.getElementById('rekomendasi-list');

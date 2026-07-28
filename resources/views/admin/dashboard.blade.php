@@ -381,15 +381,15 @@
             {{-- THRESHOLD KEPUTUSAN FUZZY --}}
             <div class="fuzzy-section">
                 <div class="fuzzy-head">
-                    🔢 Threshold keputusan Fuzzy Sugeno
+                    🔢 Threshold keputusan Fuzzy Sugeno (Tingkat Risiko Lingkungan)
                 </div>
                 <div class="fuzzy-desc">
-                    Output fuzzy (0–1) dibandingkan dengan dua nilai ini untuk menentukan status akhir.
-                    Perubahan di sini langsung memengaruhi klasifikasi HAMA / WASPADA / AMAN tanpa mengubah kode.
+                    Output fuzzy (0–1) dibandingkan dengan dua nilai ini untuk menentukan tingkat risiko lingkungan (RENDAH / SEDANG / TINGGI).
+                    Perubahan di sini langsung memengaruhi klasifikasi risiko lingkungan tanpa mengubah kode.
                 </div>
                 <div class="fuzzy-grid">
                     <div class="fuzzy-field">
-                        <label>Batas minimum HAMA (nilai fuzzy ≥ ini → HAMA)</label>
+                        <label>Batas minimum RISIKO TINGGI (nilai fuzzy ≥ ini → TINGGI)</label>
                         <input type="number" step="0.01"
                             id="threshold_hama"
                             name="settings[threshold_hama]"
@@ -400,7 +400,7 @@
                         <div class="zone-hint" style="color:#3730a3;">Default: 0.70</div>
                     </div>
                     <div class="fuzzy-field">
-                        <label>Batas minimum WASPADA (nilai fuzzy ≥ ini → WASPADA)</label>
+                        <label>Batas minimum RISIKO SEDANG (nilai fuzzy ≥ ini → SEDANG)</label>
                         <input type="number" step="0.01"
                             id="threshold_waspada"
                             name="settings[threshold_waspada]"
@@ -608,9 +608,9 @@ function updateFuzzyPreview() {
     if (!box) return;
     box.innerHTML =
         '<span style="font-size:10px;color:#3730a3;font-weight:600;">Zona output saat ini:</span>' +
-        '<span class="fuzzy-badge fb-green">0.00 – ' + (w - 0.01).toFixed(2) + ' → AMAN</span>' +
-        '<span class="fuzzy-badge fb-amber">' + w.toFixed(2) + ' – ' + (h - 0.01).toFixed(2) + ' → WASPADA</span>' +
-        '<span class="fuzzy-badge fb-red">' + h.toFixed(2) + ' – 1.00 → HAMA</span>';
+        '<span class="fuzzy-badge fb-green">0.00 – ' + (w - 0.01).toFixed(2) + ' → RENDAH</span>' +
+        '<span class="fuzzy-badge fb-amber">' + w.toFixed(2) + ' – ' + (h - 0.01).toFixed(2) + ' → SEDANG</span>' +
+        '<span class="fuzzy-badge fb-red">' + h.toFixed(2) + ' – 1.00 → TINGGI</span>';
 }
 
 // Validasi form sebelum submit

@@ -108,11 +108,14 @@ class SensorController extends Controller
         $users = User::whereIn('role', ['user', 'admin'])->get();
 
         if ($status === 'HAMA') {
-            $title = '🚨 Peringatan Hama Terdeteksi!';
-            $message = "Sistem mendeteksi risiko serangan hama tinggi dengan nilai fuzzy {$nilai}. Segera periksa kondisi tanaman jagung Anda.";
-        } elseif ($status === 'WASPADA') {
-            $title = '⚠️ Status Waspada Hama';
-            $message = "Kondisi lingkungan mulai mengarah ke risiko hama (nilai fuzzy {$nilai}). Tingkatkan frekuensi monitoring.";
+            $title = 'Hama Tikus Terdeteksi';
+            $message = 'Tikus terdeteksi pada citra kamera. Lakukan pemeriksaan dan penanganan pada area lahan terkait.';
+        } elseif ($status === 'TINGGI') {
+            $title = 'Risiko Lingkungan Tinggi';
+            $message = 'Kondisi suhu dan kelembapan menunjukkan tingkat risiko lingkungan tinggi. Disarankan melakukan pemeriksaan langsung pada lahan.';
+        } elseif ($status === 'SEDANG') {
+            $title = 'Risiko Lingkungan Sedang';
+            $message = 'Kondisi lingkungan berada pada tingkat risiko sedang. Lakukan pemantauan secara berkala.';
         } else {
             return;
         }
@@ -424,7 +427,7 @@ class SensorController extends Controller
             'confidence_yolo'  => $inputConfidenceYolo,
         ]);
 
-        if (in_array($keputusanSistem, ['HAMA', 'WASPADA'])) {
+        if (in_array($keputusanSistem, ['HAMA', 'TINGGI', 'SEDANG'])) {
             $this->createNotification($keputusanSistem, $nilaiFuzzy, $sensor);
         }
 
@@ -471,11 +474,7 @@ class SensorController extends Controller
         $hasilDeteksiYolo = 'OFF';
 
         // 3. Keputusan Sistem (Sesuai Tabel Decision Rule)
-        if ($hasilDeteksiYolo === 'ON' || $prediksiSensor === 'HAMA') {
-            $keputusanSistem = 'HAMA';
-        } else {
-            $keputusanSistem = $prediksiSensor; // 'AMAN' atau 'WASPADA'
-        }
+        $keputusanSistem = $this->getSystemDecision($hasilDeteksiYolo, $prediksiSensor);
 
         $sensor = SensorReading::create([
             'suhu'             => $suhu,
@@ -485,7 +484,7 @@ class SensorController extends Controller
             'deteksi'          => $keputusanSistem,
         ]);
 
-        if (in_array($keputusanSistem, ['HAMA', 'WASPADA'])) {
+        if (in_array($keputusanSistem, ['HAMA', 'TINGGI', 'SEDANG'])) {
             $this->createNotification($keputusanSistem, $nilaiFuzzy, $sensor);
         }
 
@@ -572,18 +571,88 @@ class SensorController extends Controller
         $th = ThresholdSetting::getValue('threshold_hama',    0.70);
         $tw = ThresholdSetting::getValue('threshold_waspada', 0.45);
 
-        if ($nilai >= $th) return ['HAMA',    'status-high'];
-        if ($nilai >= $tw) return ['WASPADA', 'status-medium'];
-        return                    ['AMAN',    'status-low'];
+        if ($nilai >= $th) return ['TINGGI', 'status-high'];
+        if ($nilai >= $tw) return ['SEDANG', 'status-medium'];
+        return                    ['RENDAH', 'status-low'];
     }
 
     // ================== HELPER: DECISION RULE (Single Source of Truth) ==================
-    public function getSystemDecision(string $hasilDeteksiYolo, string $prediksiSensor): string
+    public function getSystemDecision(?string $hasilDeteksiYolo, string $prediksiSensor): string
     {
-        if (strtoupper(trim($hasilDeteksiYolo)) === 'ON' || strtoupper(trim($prediksiSensor)) === 'HAMA') {
+        if (strtoupper(trim($hasilDeteksiYolo ?? '')) === 'ON') {
             return 'HAMA';
         }
-        return $prediksiSensor;
+
+        // Apabila YOLO tidak ON (OFF, null, kosong, invalid, offline), status akhir mengikuti tingkat risiko Fuzzy Sugeno
+        if (in_array($prediksiSensor, ['TINGGI', 'SEDANG', 'RENDAH'])) {
+            return $prediksiSensor;
+        }
+
+        // Pemetaan kompatibilitas jika $prediksiSensor masih bernilai label lama
+        if ($prediksiSensor === 'HAMA') return 'TINGGI';
+        if ($prediksiSensor === 'WASPADA') return 'SEDANG';
+        if ($prediksiSensor === 'AMAN') return 'RENDAH';
+
+        return $prediksiSensor ?: 'RENDAH';
+    }
+
+    /**
+     * Single Source of Truth helper untuk menentukan label & class tampilan status UI.
+     * Mencegah kalkulasi ulang dengan threshold hardcoded di Blade.
+     */
+    public static function formatDisplayStatus($item): array
+    {
+        $deteksiYolo = is_object($item) ? ($item->deteksi_yolo ?? null) : ($item['deteksi_yolo'] ?? null);
+        $deteksiDb   = is_object($item) ? ($item->deteksi ?? $item->status ?? null) : ($item['deteksi'] ?? $item['status'] ?? null);
+        $nilaiFuzzy  = is_object($item) ? ($item->nilai_fuzzy ?? null) : ($item['nilai_fuzzy'] ?? null);
+
+        $isYoloOn = (strtoupper(trim((string)$deteksiYolo)) === 'ON');
+
+        if ($isYoloOn) {
+            return [
+                'label' => 'HAMA TERDETEKSI',
+                'class' => 'status-high',
+                'badge' => 'bs-hama',
+            ];
+        }
+
+        // Jika YOLO bukan ON, tentukan status risiko lingkungan
+        $statusRisiko = null;
+
+        // 1. Jika status DB tersimpan sebagai RENDAH, SEDANG, TINGGI
+        if (in_array($deteksiDb, ['RENDAH', 'SEDANG', 'TINGGI'])) {
+            $statusRisiko = $deteksiDb;
+        }
+        // 2. Jika data lama di mana nilai_fuzzy ada, petakan menggunakan threshold dinamis DB
+        elseif ($nilaiFuzzy !== null) {
+            $th = ThresholdSetting::getValue('threshold_hama', 0.70);
+            $tw = ThresholdSetting::getValue('threshold_waspada', 0.45);
+            $val = (float)$nilaiFuzzy;
+
+            if ($val >= $th) {
+                $statusRisiko = 'TINGGI';
+            } elseif ($val >= $tw) {
+                $statusRisiko = 'SEDANG';
+            } else {
+                $statusRisiko = 'RENDAH';
+            }
+        }
+        // 3. Untuk data lama tanpa nilai_fuzzy
+        elseif (in_array($deteksiDb, ['HAMA', 'WASPADA', 'AMAN'])) {
+            if ($deteksiDb === 'HAMA') return ['label' => 'RISIKO TINGGI (DATA LAMA)', 'class' => 'status-high', 'badge' => 'bs-hama'];
+            if ($deteksiDb === 'WASPADA') return ['label' => 'RISIKO SEDANG (DATA LAMA)', 'class' => 'status-medium', 'badge' => 'bs-waspada'];
+            return ['label' => 'RISIKO RENDAH (DATA LAMA)', 'class' => 'status-low', 'badge' => 'bs-aman'];
+        } else {
+            $statusRisiko = 'RENDAH';
+        }
+
+        if ($statusRisiko === 'TINGGI') {
+            return ['label' => 'RISIKO LINGKUNGAN TINGGI', 'class' => 'status-high', 'badge' => 'bs-hama'];
+        } elseif ($statusRisiko === 'SEDANG') {
+            return ['label' => 'RISIKO LINGKUNGAN SEDANG', 'class' => 'status-medium', 'badge' => 'bs-waspada'];
+        } else {
+            return ['label' => 'RISIKO LINGKUNGAN RENDAH', 'class' => 'status-low', 'badge' => 'bs-aman'];
+        }
     }
 
     // ================== DASHBOARD ==================
@@ -708,8 +777,16 @@ class SensorController extends Controller
         elseif ($filter === '3bulan') $query->where('created_at', '>=', now()->subMonths(3));
 
         $filterDeteksi = request('deteksi');
-        if (in_array($filterDeteksi, ['HAMA', 'WASPADA', 'AMAN'])) {
-            $query->where('deteksi', $filterDeteksi);
+        if (in_array($filterDeteksi, ['HAMA', 'TINGGI', 'SEDANG', 'RENDAH', 'WASPADA', 'AMAN'])) {
+            if ($filterDeteksi === 'TINGGI') {
+                $query->whereIn('deteksi', ['TINGGI']);
+            } elseif ($filterDeteksi === 'SEDANG') {
+                $query->whereIn('deteksi', ['SEDANG', 'WASPADA']);
+            } elseif ($filterDeteksi === 'RENDAH') {
+                $query->whereIn('deteksi', ['RENDAH', 'AMAN']);
+            } else {
+                $query->where('deteksi', $filterDeteksi);
+            }
         }
 
         $data = $query->paginate(10);
@@ -1016,8 +1093,16 @@ class SensorController extends Controller
         elseif ($filter === '3bulan') $query->where('created_at', '>=', now()->subMonths(3));
 
         $filterDeteksi = request('deteksi');
-        if (in_array($filterDeteksi, ['HAMA', 'WASPADA', 'AMAN'])) {
-            $query->where('deteksi', $filterDeteksi);
+        if (in_array($filterDeteksi, ['HAMA', 'TINGGI', 'SEDANG', 'RENDAH', 'WASPADA', 'AMAN'])) {
+            if ($filterDeteksi === 'TINGGI') {
+                $query->whereIn('deteksi', ['TINGGI']);
+            } elseif ($filterDeteksi === 'SEDANG') {
+                $query->whereIn('deteksi', ['SEDANG', 'WASPADA']);
+            } elseif ($filterDeteksi === 'RENDAH') {
+                $query->whereIn('deteksi', ['RENDAH', 'AMAN']);
+            } else {
+                $query->where('deteksi', $filterDeteksi);
+            }
         }
 
         $data = $query->paginate(15);

@@ -79,23 +79,24 @@
                 <div style="font-size:24px; font-weight:700; color:{{ $isOnline ? ($status=='HAMA' ? '#dc2626' : ($status=='WASPADA' ? '#f59e0b' : '#22c55e')) : '#94a3b8' }};">
                     <span id="live-status-text">
                         @if(!$isOnline) Offline
-                        @elseif($status=='HAMA') Terdeteksi!
-                        @elseif($status=='WASPADA') Waspada
-                        @else Aman
+                        @elseif($status=='HAMA') Hama Terdeteksi!
+                        @elseif($status=='TINGGI') Risiko Tinggi
+                        @elseif($status=='SEDANG' || $status=='WASPADA') Risiko Sedang
+                        @else Risiko Rendah
                         @endif
                     </span>
                 </div>
                 <div>
                     <span id="live-status-badge-besar" class="status-badge-besar
                         @if(!$isOnline) badge-offline
-                        @elseif($status=='HAMA') badge-hama
-                        @elseif($status=='WASPADA') badge-waspada
+                        @elseif($status=='HAMA' || $status=='TINGGI') badge-hama
+                        @elseif($status=='SEDANG' || $status=='WASPADA') badge-waspada
                         @else badge-aman
                         @endif">
                         @if(!$isOnline)
                             OFFLINE
                         @else
-                            Keputusan Akhir: {{ $status }}
+                            Keputusan Akhir: {{ $status == 'HAMA' ? 'HAMA TERDETEKSI' : ($status == 'TINGGI' ? 'RISIKO LINGKUNGAN TINGGI' : ($status == 'SEDANG' || $status == 'WASPADA' ? 'RISIKO LINGKUNGAN SEDANG' : 'RISIKO LINGKUNGAN RENDAH')) }}
                         @endif
                     </span>
                 </div>
@@ -312,7 +313,7 @@
                     @forelse($data as $d)
                     @php
                         $nf = round($d->nilai_fuzzy ?? 0, 3);
-                        $st = $d->deteksi ?? ($nf >= 0.70 ? 'HAMA' : ($nf >= 0.45 ? 'WASPADA' : 'AMAN'));
+                        $disp = \App\Http\Controllers\SensorController::formatDisplayStatus($d);
                     @endphp
                     <tr>
                         <td style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--abu);">
@@ -324,11 +325,7 @@
                         <td><span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;">{{ $d->kelembapan_tanah }}%</span></td>
                         <td style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;">{{ $nf }}</td>
                         <td>
-                            <span class="badge-status
-                                @if($st=='HAMA') bs-hama
-                                @elseif($st=='WASPADA') bs-waspada
-                                @else bs-aman
-                                @endif">{{ $st }}</span>
+                            <span class="badge-status {{ $disp['badge'] }}">{{ $disp['label'] }}</span>
                         </td>
                     </tr>
                     @empty
@@ -445,18 +442,23 @@
                 if (statusHama === 'HAMA') {
                     if (statusCard)  statusCard.style.borderLeftColor = '#dc2626';
                     if (statusIcon)  statusIcon.innerText  = '🚨';
-                    if (statusText)  statusText.innerText  = 'Terdeteksi!';
-                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-hama'; statusBadge.innerText = 'Keputusan Akhir: HAMA'; }
-                } else if (statusHama === 'WASPADA') {
+                    if (statusText)  statusText.innerText  = 'Hama Terdeteksi!';
+                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-hama'; statusBadge.innerText = 'Keputusan Akhir: HAMA TERDETEKSI'; }
+                } else if (statusHama === 'TINGGI') {
+                    if (statusCard)  statusCard.style.borderLeftColor = '#dc2626';
+                    if (statusIcon)  statusIcon.innerText  = '⚠️';
+                    if (statusText)  statusText.innerText  = 'Risiko Tinggi';
+                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-hama'; statusBadge.innerText = 'Keputusan Akhir: RISIKO LINGKUNGAN TINGGI'; }
+                } else if (statusHama === 'SEDANG' || statusHama === 'WASPADA') {
                     if (statusCard)  statusCard.style.borderLeftColor = '#f59e0b';
                     if (statusIcon)  statusIcon.innerText  = '⚠️';
-                    if (statusText)  statusText.innerText  = 'Waspada';
-                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-waspada'; statusBadge.innerText = 'Keputusan Akhir: WASPADA'; }
+                    if (statusText)  statusText.innerText  = 'Risiko Sedang';
+                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-waspada'; statusBadge.innerText = 'Keputusan Akhir: RISIKO LINGKUNGAN SEDANG'; }
                 } else {
                     if (statusCard)  statusCard.style.borderLeftColor = '#22c55e';
                     if (statusIcon)  statusIcon.innerText  = '✅';
-                    if (statusText)  statusText.innerText  = 'Aman';
-                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-aman'; statusBadge.innerText = 'Keputusan Akhir: AMAN'; }
+                    if (statusText)  statusText.innerText  = 'Risiko Rendah';
+                    if (statusBadge) { statusBadge.className = 'status-badge-besar badge-aman'; statusBadge.innerText = 'Keputusan Akhir: RISIKO LINGKUNGAN RENDAH'; }
                 }
 
                 // Update Kesehatan Tanah card
@@ -517,7 +519,7 @@
                 var meterVal = document.getElementById('live-fuzzy-meter-val');
                 if (meterVal) {
                     meterVal.innerText    = nilaiFuzzy.toFixed(3);
-                    meterVal.style.color  = statusHama === 'HAMA' ? '#dc2626' : (statusHama === 'WASPADA' ? '#d97706' : '#16a34a');
+                    meterVal.style.color  = (statusHama === 'HAMA' || statusHama === 'TINGGI') ? '#dc2626' : ((statusHama === 'SEDANG' || statusHama === 'WASPADA') ? '#d97706' : '#16a34a');
                 }
                 var ptr = document.getElementById('meterPtr');
                 if (ptr) ptr.style.left = (nilaiFuzzy * 100).toFixed(1) + '%';
@@ -530,8 +532,8 @@
 
                 var analisisBadge = document.getElementById('analisis-status-badge');
                 if (analisisBadge) {
-                    analisisBadge.innerText  = statusHama;
-                    analisisBadge.className  = 'badge-status ' + (statusHama === 'HAMA' ? 'bs-hama' : (statusHama === 'WASPADA' ? 'bs-waspada' : 'bs-aman'));
+                    analisisBadge.innerText  = (statusHama === 'HAMA' ? 'HAMA TERDETEKSI' : (statusHama === 'TINGGI' ? 'RISIKO TINGGI' : (statusHama === 'SEDANG' || statusHama === 'WASPADA' ? 'RISIKO SEDANG' : 'RISIKO RENDAH')));
+                    analisisBadge.className  = 'badge-status ' + ((statusHama === 'HAMA' || statusHama === 'TINGGI') ? 'bs-hama' : ((statusHama === 'SEDANG' || statusHama === 'WASPADA') ? 'bs-waspada' : 'bs-aman'));
                 }
 
                 // Rekomendasi
@@ -541,16 +543,20 @@
 
                 if (statusHama === 'HAMA') {
                     if (rekBox)   rekBox.className   = 'rekomendasi-box hama';
-                    if (rekJudul) rekJudul.innerHTML = '🚨 Tindakan Segera Diperlukan!';
-                    if (rekIsi)   rekIsi.innerText   = 'Kondisi lingkungan saat ini sangat mendukung perkembangan hama. Segera lakukan pemeriksaan fisik pada tanaman jagung dan pertimbangkan tindakan pengendalian hama.';
-                } else if (statusHama === 'WASPADA') {
+                    if (rekJudul) rekJudul.innerHTML = '🚨 Hama Tikus Terdeteksi!';
+                    if (rekIsi)   rekIsi.innerText   = 'Tikus terdeteksi pada citra kamera. Lakukan pemeriksaan dan penanganan pada area lahan terkait.';
+                } else if (statusHama === 'TINGGI') {
+                    if (rekBox)   rekBox.className   = 'rekomendasi-box hama';
+                    if (rekJudul) rekJudul.innerHTML = '⚠️ Risiko Lingkungan Tinggi';
+                    if (rekIsi)   rekIsi.innerText   = 'Kondisi suhu dan kelembapan menunjukkan tingkat risiko lingkungan tinggi. Disarankan melakukan pemeriksaan langsung pada lahan.';
+                } else if (statusHama === 'SEDANG' || statusHama === 'WASPADA') {
                     if (rekBox)   rekBox.className   = 'rekomendasi-box waspada';
-                    if (rekJudul) rekJudul.innerHTML = '⚠️ Pantau Lebih Sering';
-                    if (rekIsi)   rekIsi.innerText   = 'Kondisi mulai mengarah ke risiko hama. Tingkatkan frekuensi monitoring dan periksa bagian daun dan batang tanaman secara berkala.';
+                    if (rekJudul) rekJudul.innerHTML = '⚠️ Risiko Lingkungan Sedang';
+                    if (rekIsi)   rekIsi.innerText   = 'Kondisi lingkungan berada pada tingkat risiko sedang. Lakukan pemantauan secara berkala.';
                 } else {
                     if (rekBox)   rekBox.className   = 'rekomendasi-box aman';
-                    if (rekJudul) rekJudul.innerHTML = '✅ Kondisi Terkendali';
-                    if (rekIsi)   rekIsi.innerText   = 'Kondisi sensor dalam batas aman. Lanjutkan pemantauan rutin dan pastikan perangkat IoT berfungsi optimal.';
+                    if (rekJudul) rekJudul.innerHTML = '✅ Risiko Lingkungan Rendah';
+                    if (rekIsi)   rekIsi.innerText   = 'Kondisi lingkungan dalam batas aman. Lanjutkan pemantauan rutin.';
                 }
             })
             .catch(function(err) {

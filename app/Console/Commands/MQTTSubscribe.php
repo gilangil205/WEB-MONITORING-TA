@@ -129,7 +129,7 @@ class MQTTSubscribe extends Command
                 $this->info('Data BERHASIL disimpan ke Database (Interval 15 Menit)!');
 
                 // NOTIFIKASI
-                if (in_array($keputusanSistem, ['HAMA', 'WASPADA'])) {
+                if (in_array($keputusanSistem, ['HAMA', 'TINGGI', 'SEDANG'])) {
                     $lastNotif = Notification::where('status', $keputusanSistem)
                                              ->where('created_at', '>=', now()->subMinutes(15))
                                              ->first();
@@ -241,8 +241,8 @@ class MQTTSubscribe extends Command
         $th = ThresholdSetting::getValue('threshold_hama',    0.70);
         $tw = ThresholdSetting::getValue('threshold_waspada', 0.45);
 
-        if ($nilai >= $th) return ['HAMA',    'status-high'];
-        if ($nilai >= $tw) return ['WASPADA', 'status-medium'];
-        return                    ['AMAN',    'status-low'];
+        if ($nilai >= $th) return ['TINGGI', 'status-high'];
+        if ($nilai >= $tw) return ['SEDANG', 'status-medium'];
+        return                    ['RENDAH', 'status-low'];
     }
 }
