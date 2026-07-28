@@ -276,3 +276,63 @@ Apabila di kemudian hari perubahan ini ingin dibatalkan secara aman tanpa merusa
 | m. Apakah semua unit test berhasil? | **YA (100% PASS)** |
 | n. Status Kelayakan Integrasi & Kode | **SIAP** |
 | o. Status Persiapan Commit / Push | **SIAP (Menunggu persetujuan eksplisit pengguna)** |
+
+---
+
+## 20. PEMISAHAN DATA LIVE YOLO DAN DATA HISTORIS SENSOR
+
+### 1. Masalah Sebelum Perbaikan
+Python YOLO mengirimkan request HTTP `POST /api/sensor` berisi status `OFF` / `ON`, `confidence`, dan file gambar secara berulang mengikuti *loop* deteksi (sekitar 1 detik per request). Sebelumnya, setiap request HTTP tersebut mengeksekusi `SensorReading::create()` tanpa memfilter kejadian, sehingga dalam waktu singkat database `sensor_readings` dibanjiri ribuan record duplikat dan ribuan file foto `OFF`.
+
+### 2. Penyebab Ribuan Record
+`SensorController::store()` mengeksekusi pembuatan baris database `SensorReading::create()` secara acak tanpa mengecek apakah request yang masuk merupakan frame rutin `OFF`, transisi kejadian `OFF → ON`, atau duplikat `ON`.
+
+### 3. Alur Data Live
+Data live diperbarui pada setiap request HTTP dari Python YOLO tanpa membuat record database baru:
+- Status & confidence YOLO disimpan pada cache Laravel (`yolo_live_data` & `latest_yolo_status`).
+- File gambar live disimpan atau ditimpa pada path stabil `storage/app/public/kamera/latest_live.jpg`.
+- Panel Kamera utama membaca data dari cache live tersebut.
+
+### 4. Alur Data Historis 15 Menit
+Penyimpanan rutin data sensor lingkungan (suhu, kelembapan udara, kelembapan tanah) dilakukan maksimal setiap 15 menit melalui jalur `MQTTSubscribe.php` atau pencatatan rutin. Saat record 15 menit dibuat, sistem membaca status YOLO & confidence terbaru dari cache live, serta menyalin gambar live `latest_live.jpg` menjadi file snapshot permanen `storage/app/public/kamera/periodic_{timestamp}_{uniqid}.jpg`.
+
+### 5. Alur Event HAMA Real-Time (Transisi OFF → ON)
+Ketika terjadi transisi status **OFF → ON** (deteksi hama tikus baru):
+- Sistem langsung membuat 1 record `SensorReading` di database (`deteksi = 'HAMA'`).
+- Gambar bukti disalin menjadi file permanen `storage/app/public/kamera/hama_on_{timestamp}_{uniqid}.jpg`.
+- Notifikasi darurat `"Hama Tikus Terdeteksi"` langsung dikirimkan ke pengguna.
+- Proses dilakukan secara *real-time* tanpa menunggu interval 15 menit.
+
+### 6. Pencegahan Duplikasi ON & Atomic Lock
+Untuk mencegah *race condition* jika dua request `ON` masuk hampir bersamaan:
+- Digunakan `Cache::lock('yolo_on_transition_lock', 5)` untuk memastikan hanya 1 proses transisi yang berjalan.
+- Selama status tetap `ON → ON`, request berikutnya hanya memperbarui data live & gambar live, tanpa membuat record database atau notifikasi baru.
+
+### 7. Pengelolaan Gambar Live & Permanen
+- **Gambar Live:** Path stabil `kamera/latest_live.jpg` selalu memuat citra visual terbaru.
+- **Gambar Historis:** File permanen dengan nama unik (`hama_on_...` atau `periodic_...`) disimpan di database dan tidak pernah ditimpa.
+
+### 8. Perbaikan Riwayat Foto Kamera (5 Terakhir)
+- Server-side render pertama kali pada `SensorController::kamera()` langsung mengirimkan variabel `$riwayatHtml` berisi 5 foto terbaru yang memiliki gambar (baik status `ON` maupun `OFF`).
+- Endpoint AJAX `/api/kamera/latest` mengembalikan HTML riwayat foto secara konsisten.
+- Diperbaiki penanganan error JavaScript agar indikator loading `"Memuat riwayat foto..."` langsung dihentikan dan diganti dengan teks yang wajar jika koneksi terputus.
+
+### 9. Daftar File yang Diubah
+- `app/Http/Controllers/SensorController.php` (Penanganan transisi live/historis & riwayat foto)
+- `app/Console/Commands/MQTTSubscribe.php` (Penyimpanan snapshot gambar pada record berkala 15 menit)
+- `resources/views/kamera.blade.php` (Server-side render `$riwayatHtml` & penanganan error polling JS)
+- `docs/LAPORAN_PERUBAHAN_FUZZY_DAN_DECISION_RULE.md` (Dokumentasi lengkap)
+
+### 10. Hasil Pengujian (`tests/test_yolo_behavior.php`)
+- **10 Request OFF Berulang:** 0 record DB baru, 0 notifikasi baru (100% PASS).
+- **Transisi OFF → ON:** 1 record HAMA dibuat, gambar bukti permanen disimpan, 1 notifikasi dikirim per user (100% PASS).
+- **10 Request ON Berulang:** 0 record DB duplikat, 0 notifikasi duplikat (100% PASS).
+- **Transisi ON → OFF:** Status live kembali ke OFF, 0 record DB duplikat (100% PASS).
+- **Endpoint Kamera Latest:** Mengembalikan HTML 5 foto terbaru dengan URL valid (100% PASS).
+
+### 11. Keterbatasan
+Python YOLO masih dapat mengirim request HTTP secara berulang pada setiap frame deteksi, namun dampaknya terhadap pembengkakan database dan penyimpanan disk telah **100% dikendalikan di sisi Laravel**.
+
+### 12. Konfirmasi Skema Database & Payload
+- Format payload JSON Python: **TIDAK DIUBAH** (`sensor_name`, `status`, `value`, `timestamp`, `image`).
+- Migration / Schema Database: **TIDAK DIUBAH** (Menggunakan tabel & kolom `sensor_readings` yang ada).

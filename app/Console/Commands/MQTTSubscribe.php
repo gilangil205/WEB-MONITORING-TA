@@ -116,11 +116,20 @@ class MQTTSubscribe extends Command
 
             // Simpan ke Database hanya jika selisih waktu >= 15 menit
             if ($shouldSave) {
+                // Salin gambar live terbaru menjadi file permanen jika tersedia
+                $permanentPath = null;
+                if (\Illuminate\Support\Facades\Storage::disk('public')->exists('kamera/latest_live.jpg')) {
+                    $permanentFilename = 'kamera/periodic_' . time() . '_' . uniqid() . '.jpg';
+                    \Illuminate\Support\Facades\Storage::disk('public')->copy('kamera/latest_live.jpg', $permanentFilename);
+                    $permanentPath = $permanentFilename;
+                }
+
                 $sensor = SensorReading::create([
                     'suhu'             => $suhu,
                     'kelembapan_udara' => $udara,
                     'kelembapan_tanah' => $tanah,
                     'nilai_fuzzy'      => $nilai_fuzzy,
+                    'image'            => $permanentPath,
                     'deteksi'          => $keputusanSistem,
                     'deteksi_yolo'     => $inputDeteksiYolo,
                     'confidence_yolo'  => $inputConfidenceYolo,

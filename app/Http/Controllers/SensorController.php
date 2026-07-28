@@ -205,7 +205,9 @@ class SensorController extends Controller
     // ================== ENDPOINT: /api/kamera/latest ==================
     public function kameraLatest()
     {
-        if (Cache::has('iot_live_data')) {
+        $isOnline = Cache::has('iot_live_data');
+
+        if ($isOnline) {
             $d         = Cache::get('iot_live_data');
             $updatedAt = isset($d['updated_at']) ? Carbon::parse($d['updated_at']) : now();
             
@@ -221,7 +223,37 @@ class SensorController extends Controller
                 $d['deteksi'] = $d['keputusan_sistem'];
             }
         } else {
-            return response()->json(['success' => false, 'isOnline' => false]);
+            $latestReading = SensorReading::latest()->first();
+            if ($latestReading) {
+                $d = [
+                    'suhu'             => $latestReading->suhu,
+                    'kelembapan_udara' => $latestReading->kelembapan_udara,
+                    'kelembapan_tanah' => $latestReading->kelembapan_tanah,
+                    'nilai_fuzzy'      => $latestReading->nilai_fuzzy ?? 0,
+                    'deteksi'          => $latestReading->deteksi ?? 'AMAN',
+                    'prediksi_sensor'  => $latestReading->deteksi ?? 'AMAN',
+                    'hasil_deteksi_yolo' => ($latestReading->deteksi_yolo === 'ON') ? 'ON' : 'OFF',
+                    'keputusan_sistem' => $latestReading->deteksi ?? 'AMAN',
+                ];
+                $updatedAt = $latestReading->created_at;
+
+                if (Cache::has('yolo_live_data')) {
+                    $yolo = Cache::get('yolo_live_data');
+                    $d['deteksi_yolo']       = $yolo['deteksi_yolo'] ?? null;
+                    $d['confidence_yolo']    = $yolo['confidence_yolo'] ?? null;
+                    $d['hasil_deteksi_yolo'] = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
+                    $d['keputusan_sistem']   = $this->getSystemDecision($d['hasil_deteksi_yolo'], $d['prediksi_sensor']);
+                    $d['deteksi']            = $d['keputusan_sistem'];
+                }
+            } else {
+                $fotoData    = SensorReading::whereNotNull('image')->latest()->take(5)->get();
+                $riwayatHtml = $this->buildRiwayatHtml($fotoData);
+                return response()->json([
+                    'success'      => false,
+                    'isOnline'     => false,
+                    'riwayat_html' => $riwayatHtml,
+                ]);
+            }
         }
 
         $rekomendasi = $this->getRekomendasiByStatus($d['deteksi']);
@@ -296,12 +328,15 @@ class SensorController extends Controller
 
             // Build YOLO badge jika ada data YOLO
             $yoloBadge = '';
-            if ($fd->deteksi_yolo && $fd->confidence_yolo !== null) {
-                $confidence = round($fd->confidence_yolo * 100);
-                $confidenceColor = $confidence >= 70 ? '#dc2626' : '#d97706';
+            if ($fd->deteksi_yolo !== null) {
+                $isYoloOn = (strtoupper(trim((string)$fd->deteksi_yolo)) === 'ON');
+                $labelText = $isYoloOn ? 'ON - TIKUS TERDETEKSI PADA CITRA' : 'OFF - TIKUS TIDAK TERDETEKSI PADA CITRA';
+                $badgeBg = $isYoloOn ? '#dc2626' : '#16a34a';
+                $confidenceStr = ($fd->confidence_yolo !== null) ? ' (' . round($fd->confidence_yolo * 100) . '%)' : '';
+
                 $yoloBadge = '<span class="yolo-badge" style="position:absolute; top:4px; right:4px; background:' 
-                           . $confidenceColor . '; color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; z-index:5;">'
-                           . '🎯 ' . htmlspecialchars($fd->deteksi_yolo) . ' (' . $confidence . '%)'
+                           . $badgeBg . '; color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; z-index:5;">'
+                           . '🎯 ' . htmlspecialchars($labelText . $confidenceStr)
                            . '</span>';
             }
 
@@ -310,7 +345,7 @@ class SensorController extends Controller
                    . 'class="foto-item" title="' . $fd->created_at->format('d M Y H:i') . '">'
                    . '<img src="' . asset('storage/' . $fd->image) . '" alt="Foto tanaman">'
                    . $yoloBadge
-                   . '<span class="foto-badge ' . $badgeClass . '">' . $statusR . '</span>'
+                   . '<span class="foto-badge ' . $badgeClass . '">' . htmlspecialchars($statusR) . '</span>'
                    . '</a>';
         }
         
@@ -369,7 +404,8 @@ class SensorController extends Controller
 
         $path = null;
         if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('kamera', 'public');
+            // Simpan gambar live terbaru dengan path stabil
+            $path = $request->file('image')->storeAs('kamera', 'latest_live.jpg', 'public');
         }
 
         $nilaiFuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);
@@ -381,11 +417,13 @@ class SensorController extends Controller
         $inputDeteksiYolo = $request->input('status') ?? $request->input('deteksi_yolo');
         $inputConfidenceYolo = $request->input('value') ?? $request->input('confidence_yolo');
         
-        $yoloInput = strtoupper(trim($inputDeteksiYolo ?? 'OFF'));
+        $yoloInput = strtoupper(trim((string)($inputDeteksiYolo ?? 'OFF')));
         $hasilDeteksiYolo = ($yoloInput === 'ON') ? 'ON' : 'OFF';
 
         // 3. Keputusan Sistem (Sesuai Tabel Decision Rule)
         $keputusanSistem = $this->getSystemDecision($hasilDeteksiYolo, $prediksiSensor);
+
+        $liveImagePath = $path ? asset('storage/' . $path) : (Storage::disk('public')->exists('kamera/latest_live.jpg') ? asset('storage/kamera/latest_live.jpg') : null);
 
         $newData = [
             'suhu'             => $suhu,
@@ -398,7 +436,7 @@ class SensorController extends Controller
             'prediksi_sensor'  => $prediksiSensor,
             'hasil_deteksi_yolo' => $hasilDeteksiYolo,
             'keputusan_sistem' => $keputusanSistem,
-            'image'            => $path ? asset('storage/' . $path) : null,
+            'image'            => $liveImagePath,
             'updated_at'       => now()->toIso8601String(),
         ];
 
@@ -407,15 +445,97 @@ class SensorController extends Controller
             // ESP32 Request: Update status alat menjadi ONLINE (TTL 7 menit)
             Cache::put('iot_live_data', $newData, now()->addMinutes(7));
         } else {
-            // Python YOLO Request: Simpan status YOLO TANPA mengubah status ONLINE ESP32
+            // Python YOLO Request: Simpan status YOLO live
             Cache::put('yolo_live_data', [
                 'deteksi_yolo'       => $inputDeteksiYolo,
                 'confidence_yolo'    => $inputConfidenceYolo,
                 'hasil_deteksi_yolo' => $hasilDeteksiYolo,
                 'keputusan_sistem'   => $keputusanSistem,
-            ], now()->addMinutes(2));
+                'image'              => $liveImagePath,
+            ], now()->addMinutes(15));
         }
 
+        // ── PENANGANAN PENYIMPANAN REKOMENDASI / HISTORIS ──
+        if ($isYoloOnly) {
+            $prevYoloStatus = Cache::get('latest_yolo_status', 'OFF');
+
+            // TRANSISI OFF -> ON: Kejadian HAMA baru
+            if ($prevYoloStatus !== 'ON' && $hasilDeteksiYolo === 'ON') {
+                $sensor = null;
+                $lock = Cache::lock('yolo_on_transition_lock', 5);
+                $isStored = false;
+
+                if ($lock->get()) {
+                    try {
+                        // Cek ulang dalam lock agar tidak ada duplikasi race condition
+                        if (Cache::get('latest_yolo_status', 'OFF') !== 'ON') {
+                            // Salin gambar live menjadi gambar bukti permanen dengan nama unik
+                            $permanentPath = null;
+                            if (Storage::disk('public')->exists('kamera/latest_live.jpg')) {
+                                $permanentFilename = 'kamera/hama_on_' . time() . '_' . uniqid() . '.jpg';
+                                Storage::disk('public')->copy('kamera/latest_live.jpg', $permanentFilename);
+                                $permanentPath = $permanentFilename;
+                            } elseif ($path) {
+                                $permanentPath = $path;
+                            }
+
+                            $sensor = SensorReading::create([
+                                'suhu'             => $suhu,
+                                'kelembapan_udara' => $udara,
+                                'kelembapan_tanah' => $tanah,
+                                'nilai_fuzzy'      => $nilaiFuzzy,
+                                'image'            => $permanentPath,
+                                'deteksi'          => $keputusanSistem,
+                                'deteksi_yolo'     => $inputDeteksiYolo,
+                                'confidence_yolo'  => $inputConfidenceYolo,
+                            ]);
+
+                            $this->createNotification($keputusanSistem, $nilaiFuzzy, $sensor);
+                            Cache::forever('latest_yolo_status', 'ON');
+                            $isStored = true;
+                        }
+                    } finally {
+                        $lock->release();
+                    }
+
+                    if ($isStored) {
+                        return response()->json([
+                            'message'            => 'Kejadian HAMA berhasil disimpan',
+                            'status'             => $keputusanSistem,
+                            'nilai_fuzzy'        => round($nilaiFuzzy, 4),
+                            'deteksi_yolo'       => $inputDeteksiYolo,
+                            'confidence_yolo'    => $inputConfidenceYolo,
+                            'prediksi_sensor'    => $prediksiSensor,
+                            'hasil_deteksi_yolo' => $hasilDeteksiYolo,
+                            'keputusan_sistem'   => $keputusanSistem,
+                            'stored_in_cache'    => true,
+                            'stored_in_database' => true,
+                        ], 201);
+                    }
+                }
+            }
+
+            // Jika transisi ke OFF, perbarui cache status ke OFF
+            if ($hasilDeteksiYolo === 'OFF') {
+                Cache::forever('latest_yolo_status', 'OFF');
+            }
+
+            // Request OFF rutin atau ON berulang: Hanya perbarui live data, JANGAN buat record DB baru
+            return response()->json([
+                'message'            => 'Data live diperbarui',
+                'status'             => $keputusanSistem,
+                'nilai_fuzzy'        => round($nilaiFuzzy, 4),
+                'deteksi_yolo'       => $inputDeteksiYolo,
+                'confidence_yolo'    => $inputConfidenceYolo,
+                'prediksi_sensor'    => $prediksiSensor,
+                'hasil_deteksi_yolo' => $hasilDeteksiYolo,
+                'keputusan_sistem'   => $keputusanSistem,
+                'stored_in_cache'    => true,
+                'stored_in_database' => false,
+            ], 200);
+        }
+
+        // Request non-YOLO (misal kiriman langsung sensor ESP32)
         $sensor = SensorReading::create([
             'suhu'             => $suhu,
             'kelembapan_udara' => $udara,
@@ -841,7 +961,10 @@ class SensorController extends Controller
             [$statusFuzzy, $class] = $this->getStatus($nilai);
         }
 
-        return view('kamera', compact('latest', 'nilai', 'status', 'class', 'isOnline'));
+        $fotoData = SensorReading::whereNotNull('image')->latest()->take(5)->get();
+        $riwayatHtml = $this->buildRiwayatHtml($fotoData);
+
+        return view('kamera', compact('latest', 'nilai', 'status', 'class', 'isOnline', 'riwayatHtml'));
     }
 
     // ==================================================================================

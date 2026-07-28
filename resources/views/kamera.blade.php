@@ -410,7 +410,7 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
         </a>
     </div>
     <div class="panel-body" id="riwayat-foto-wrapper">
-        <div class="foto-placeholder">📷 Memuat riwayat foto...</div>
+        {!! $riwayatHtml ?? '<div class="foto-placeholder">📷 Memuat riwayat foto...</div>' !!}
     </div>
 </div>
 </div>
@@ -565,9 +565,12 @@ function fetchLatestCameraData() {
             if (riwayatWrapper && data.riwayat_html) {
                 riwayatWrapper.innerHTML = data.riwayat_html;
             }
-        })
         .catch(function(err) {
             console.error('Gagal memperbarui data monitor kamera:', err);
+            var riwayatWrapper = document.getElementById('riwayat-foto-wrapper');
+            if (riwayatWrapper && riwayatWrapper.innerHTML.indexOf('Memuat') !== -1) {
+                riwayatWrapper.innerHTML = '<div class="foto-placeholder" style="color:#ef4444;">⚠️ Gagal memuat riwayat foto dari server.</div>';
+            }
         });
 }
 
