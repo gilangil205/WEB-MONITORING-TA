@@ -368,11 +368,27 @@
     {{-- Logika Filter Sidebar Otomatis --}}
     @if(request()->routeIs('admin.*'))
         
-        {{-- JIKA DI HALAMAN ADMIN: Sembunyikan menu petani, langsung ke menu admin --}}
+        {{-- JIKA DI HALAMAN ADMIN: Tampilkan menu navigasi Administrator --}}
         <div class="sidebar-label" style="color:#7c3aed;">Administrasi</div>
-        <a href="{{ route('admin.dashboard') }}"
-           class="admin-link {{ request()->routeIs('admin.*') ? 'active' : '' }}">
-            <i data-feather="settings"></i> Panel Admin
+
+        <a href="{{ route('admin.dashboard', ['section' => 'threshold']) }}"
+           class="admin-link {{ (request()->routeIs('admin.dashboard') && request('section', 'threshold') === 'threshold') ? 'active' : '' }}">
+            <i data-feather="sliders"></i> Konfigurasi Threshold
+        </a>
+
+        <a href="{{ route('admin.dashboard', ['section' => 'users']) }}"
+           class="admin-link {{ (request()->routeIs('admin.dashboard') && request('section') === 'users') ? 'active' : '' }}">
+            <i data-feather="users"></i> Pengguna
+        </a>
+
+        <a href="{{ route('admin.riwayat') }}"
+           class="admin-link {{ request()->routeIs('admin.riwayat') ? 'active' : '' }}">
+            <i data-feather="clock"></i> Riwayat
+        </a>
+
+        <hr class="sidebar-divider">
+        <a href="{{ route('dashboard') }}" style="font-size:13px;">
+            <i data-feather="arrow-left"></i> Dashboard Utama
         </a>
 
     @else
@@ -398,8 +414,14 @@
         @if(Auth::user()->isAdmin())
             <hr class="sidebar-divider">
             <div class="sidebar-label" style="color:#7c3aed;">Administrasi</div>
-            <a href="{{ route('admin.dashboard') }}" class="admin-link">
-                <i data-feather="settings"></i> Panel Admin
+            <a href="{{ route('admin.dashboard', ['section' => 'threshold']) }}" class="admin-link">
+                <i data-feather="sliders"></i> Konfigurasi Threshold
+            </a>
+            <a href="{{ route('admin.dashboard', ['section' => 'users']) }}" class="admin-link">
+                <i data-feather="users"></i> Pengguna
+            </a>
+            <a href="{{ route('admin.riwayat') }}" class="admin-link">
+                <i data-feather="clock"></i> Riwayat
             </a>
         @endif
         @endauth

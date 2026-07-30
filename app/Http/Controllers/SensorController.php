@@ -1038,7 +1038,7 @@ class SensorController extends Controller
 
         ThresholdSetting::clearCache();
 
-        return redirect()->route('admin.dashboard')
+        return redirect()->route('admin.dashboard', ['section' => 'threshold'])
             ->with('success', '✅ Pengaturan kondisi ideal berhasil diperbarui.');
     }
 
@@ -1057,7 +1057,7 @@ class SensorController extends Controller
 
         ThresholdSetting::clearCache();
 
-        return redirect()->route('admin.dashboard')
+        return redirect()->route('admin.dashboard', ['section' => 'threshold'])
             ->with('success', '🔄 Pengaturan dikembalikan ke nilai default penelitian.');
     }
 
@@ -1077,20 +1077,20 @@ class SensorController extends Controller
             'role'     => 'user',
         ]);
 
-        return redirect()->route('admin.dashboard')
+        return redirect()->route('admin.dashboard', ['section' => 'users'])
             ->with('success', '✅ Pengguna baru (Petani) berhasil ditambahkan.');
     }
 
     public function deleteUser(User $user)
     {
         if ($user->id === Auth::id()) {
-            return redirect()->route('admin.dashboard')
+            return redirect()->route('admin.dashboard', ['section' => 'users'])
                 ->with('error', 'Tidak dapat menghapus akun sendiri.');
         }
 
         $user->delete();
 
-        return redirect()->route('admin.dashboard')
+        return redirect()->route('admin.dashboard', ['section' => 'users'])
             ->with('success', '🗑️ Pengguna berhasil dihapus.');
     }
 
