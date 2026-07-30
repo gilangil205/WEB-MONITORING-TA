@@ -355,34 +355,34 @@
             </div>
             <div class="zone-grid">
                 <div class="zone-col">
-                    <label class="zone-label lbl-ok">✅ Zona aman — batas maks</label>
+                    <label class="zone-label lbl-ok">✅ Dingin — batas maksimum</label>
                     <input type="number" step="0.5" id="suhu_aman"
                         name="settings[suhu_aman]"
                         value="{{ old('settings.suhu_aman', $get('suhu_aman')->value) }}"
                         min="{{ $get('suhu_aman')->min_input }}"
                         max="{{ $get('suhu_aman')->max_input }}"
                         class="zone-input inp-ok" oninput="updateBar('suhu')">
-                    <div class="zone-hint">Suhu ≤ nilai ini → tidak ada hama</div>
+                    <div class="zone-hint">Suhu ≤ nilai ini → termasuk kondisi Dingin</div>
                 </div>
                 <div class="zone-col">
-                    <label class="zone-label lbl-warn">⚠️ Zona waspada — batas maks</label>
+                    <label class="zone-label lbl-warn">⚠️ Hangat — batas maksimum</label>
                     <input type="number" step="0.5" id="suhu_waspada"
                         name="settings[suhu_waspada]"
                         value="{{ old('settings.suhu_waspada', $get('suhu_waspada')->value) }}"
                         min="{{ $get('suhu_waspada')->min_input }}"
                         max="{{ $get('suhu_waspada')->max_input }}"
                         class="zone-input inp-warn" oninput="updateBar('suhu')">
-                    <div class="zone-hint">Suhu antara aman–waspada → potensi hama</div>
+                    <div class="zone-hint">Suhu berada di antara batas Dingin dan Panas → termasuk kondisi Hangat</div>
                 </div>
                 <div class="zone-col">
-                    <label class="zone-label lbl-err">🔴 Zona hama — batas min</label>
+                    <label class="zone-label lbl-err">🔴 Panas — batas minimum</label>
                     <input type="number" step="0.5" id="suhu_hama"
                         name="settings[suhu_hama]"
                         value="{{ old('settings.suhu_hama', $get('suhu_hama')->value) }}"
                         min="{{ $get('suhu_hama')->min_input }}"
                         max="{{ $get('suhu_hama')->max_input }}"
                         class="zone-input inp-err" oninput="updateBar('suhu')">
-                    <div class="zone-hint">Suhu ≥ nilai ini → ada hama</div>
+                    <div class="zone-hint">Suhu ≥ nilai ini → termasuk kondisi Panas</div>
                 </div>
             </div>
             <div class="bar-track">
@@ -396,9 +396,9 @@
                 <span>{{ $get('suhu_hama')->max_input }}°C</span>
             </div>
             <div class="legend-row">
-                <span class="leg"><span class="leg-dot" style="background:#639922"></span>Aman</span>
-                <span class="leg"><span class="leg-dot" style="background:#BA7517"></span>Waspada</span>
-                <span class="leg"><span class="leg-dot" style="background:#E24B4A"></span>Hama</span>
+                <span class="leg"><span class="leg-dot" style="background:#639922"></span>Dingin</span>
+                <span class="leg"><span class="leg-dot" style="background:#BA7517"></span>Hangat</span>
+                <span class="leg"><span class="leg-dot" style="background:#E24B4A"></span>Panas</span>
             </div>
         </div>
 
@@ -410,28 +410,28 @@
             </div>
             <div class="zone-grid">
                 <div class="zone-col">
-                    <label class="zone-label lbl-ok">✅ Zona aman — batas maks</label>
+                    <label class="zone-label lbl-ok">✅ Kering — batas maksimum</label>
                     <input type="number" step="1" id="udara_aman"
                         name="settings[udara_aman]"
                         value="{{ old('settings.udara_aman', $get('udara_aman')->value) }}"
                         min="0" max="100" class="zone-input inp-ok" oninput="updateBar('udara')">
-                    <div class="zone-hint">Udara ≤ nilai ini → tidak ada hama</div>
+                    <div class="zone-hint">Kelembapan udara ≤ nilai ini → termasuk kondisi Kering</div>
                 </div>
                 <div class="zone-col">
-                    <label class="zone-label lbl-warn">⚠️ Zona waspada — batas maks</label>
+                    <label class="zone-label lbl-warn">⚠️ Normal — batas maksimum</label>
                     <input type="number" step="1" id="udara_waspada"
                         name="settings[udara_waspada]"
                         value="{{ old('settings.udara_waspada', $get('udara_waspada')->value) }}"
                         min="0" max="100" class="zone-input inp-warn" oninput="updateBar('udara')">
-                    <div class="zone-hint">Udara antara aman–waspada → potensi hama</div>
+                    <div class="zone-hint">Kelembapan udara berada di antara batas Kering dan Lembap → termasuk kondisi Normal</div>
                 </div>
                 <div class="zone-col">
-                    <label class="zone-label lbl-err">🔴 Zona hama — batas min</label>
+                    <label class="zone-label lbl-err">🔴 Lembap — batas minimum</label>
                     <input type="number" step="1" id="udara_hama"
                         name="settings[udara_hama]"
                         value="{{ old('settings.udara_hama', $get('udara_hama')->value) }}"
                         min="0" max="100" class="zone-input inp-err" oninput="updateBar('udara')">
-                    <div class="zone-hint">Udara ≥ nilai ini → ada hama</div>
+                    <div class="zone-hint">Kelembapan udara ≥ nilai ini → termasuk kondisi Lembap</div>
                 </div>
             </div>
             <div class="bar-track">
@@ -445,9 +445,9 @@
                 <span>100%</span>
             </div>
             <div class="legend-row">
-                <span class="leg"><span class="leg-dot" style="background:#639922"></span>Aman</span>
-                <span class="leg"><span class="leg-dot" style="background:#BA7517"></span>Waspada</span>
-                <span class="leg"><span class="leg-dot" style="background:#E24B4A"></span>Hama</span>
+                <span class="leg"><span class="leg-dot" style="background:#639922"></span>Kering</span>
+                <span class="leg"><span class="leg-dot" style="background:#BA7517"></span>Normal</span>
+                <span class="leg"><span class="leg-dot" style="background:#E24B4A"></span>Lembap</span>
             </div>
         </div>
 
@@ -459,28 +459,28 @@
             </div>
             <div class="zone-grid">
                 <div class="zone-col">
-                    <label class="zone-label lbl-ok">✅ Zona aman — batas maks</label>
+                    <label class="zone-label lbl-ok">✅ Kering — batas maksimum</label>
                     <input type="number" step="1" id="tanah_aman"
                         name="settings[tanah_aman]"
                         value="{{ old('settings.tanah_aman', $get('tanah_aman')->value) }}"
                         min="0" max="100" class="zone-input inp-ok" oninput="updateBar('tanah')">
-                    <div class="zone-hint">Tanah ≤ nilai ini → tidak ada hama</div>
+                    <div class="zone-hint">Kelembapan tanah ≤ nilai ini → termasuk kondisi Kering</div>
                 </div>
                 <div class="zone-col">
-                    <label class="zone-label lbl-warn">⚠️ Zona waspada — batas maks</label>
+                    <label class="zone-label lbl-warn">⚠️ Normal — batas maksimum</label>
                     <input type="number" step="1" id="tanah_waspada"
                         name="settings[tanah_waspada]"
                         value="{{ old('settings.tanah_waspada', $get('tanah_waspada')->value) }}"
                         min="0" max="100" class="zone-input inp-warn" oninput="updateBar('tanah')">
-                    <div class="zone-hint">Tanah antara aman–waspada → potensi hama</div>
+                    <div class="zone-hint">Kelembapan tanah berada di antara batas Kering dan Lembap → termasuk kondisi Normal</div>
                 </div>
                 <div class="zone-col">
-                    <label class="zone-label lbl-err">🔴 Zona hama — batas min</label>
+                    <label class="zone-label lbl-err">🔴 Lembap — batas minimum</label>
                     <input type="number" step="1" id="tanah_hama"
                         name="settings[tanah_hama]"
                         value="{{ old('settings.tanah_hama', $get('tanah_hama')->value) }}"
                         min="0" max="100" class="zone-input inp-err" oninput="updateBar('tanah')">
-                    <div class="zone-hint">Tanah ≥ nilai ini → ada hama</div>
+                    <div class="zone-hint">Kelembapan tanah ≥ nilai ini → termasuk kondisi Lembap</div>
                 </div>
             </div>
             <div class="bar-track">
@@ -494,9 +494,9 @@
                 <span>100%</span>
             </div>
             <div class="legend-row">
-                <span class="leg"><span class="leg-dot" style="background:#639922"></span>Aman</span>
-                <span class="leg"><span class="leg-dot" style="background:#BA7517"></span>Waspada</span>
-                <span class="leg"><span class="leg-dot" style="background:#E24B4A"></span>Hama</span>
+                <span class="leg"><span class="leg-dot" style="background:#639922"></span>Kering</span>
+                <span class="leg"><span class="leg-dot" style="background:#BA7517"></span>Normal</span>
+                <span class="leg"><span class="leg-dot" style="background:#E24B4A"></span>Lembap</span>
             </div>
         </div>
 
@@ -594,12 +594,12 @@
             var vH = parseFloat(document.getElementById(n + '_hama').value);
             if (vA >= vW) {
                 e.preventDefault();
-                alert('⚠️ ' + labels[n] + ': batas aman (' + vA + ') harus lebih kecil dari batas waspada (' + vW + ').');
+                alert('⚠️ ' + labels[n] + ': nilai batas pertama (' + vA + ') harus lebih kecil dari nilai batas kedua (' + vW + ').');
                 return false;
             }
             if (vW >= vH) {
                 e.preventDefault();
-                alert('⚠️ ' + labels[n] + ': batas waspada (' + vW + ') harus lebih kecil dari batas hama (' + vH + ').');
+                alert('⚠️ ' + labels[n] + ': nilai batas kedua (' + vW + ') harus lebih kecil dari nilai batas ketiga (' + vH + ').');
                 return false;
             }
         }
@@ -607,7 +607,7 @@
         var tw = parseFloat(document.getElementById('threshold_waspada').value);
         if (tw >= th) {
             e.preventDefault();
-            alert('⚠️ Threshold WASPADA (' + tw + ') harus mebih kecil dari threshold HAMA (' + th + ').');
+            alert('⚠️ Threshold WASPADA (' + tw + ') harus lebih kecil dari threshold HAMA (' + th + ').');
             return false;
         }
     });
