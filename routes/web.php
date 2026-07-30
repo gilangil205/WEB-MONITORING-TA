@@ -5,10 +5,13 @@ use App\Http\Controllers\SensorController;
 use App\Http\Controllers\NotificationController;
 
 Route::get('/', function () {
+    if (auth()->check() && auth()->user()->isAdmin()) {
+        return redirect()->route('admin.dashboard');
+    }
     return redirect()->route('dashboard');
 });
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'user'])->group(function () {
     Route::get('/dashboard', [SensorController::class, 'index'])->name('dashboard');
     Route::get('/prediksi',   [SensorController::class, 'prediksi'])->name('prediksi');
     Route::get('/riwayat',    [SensorController::class, 'riwayat'])->name('riwayat');

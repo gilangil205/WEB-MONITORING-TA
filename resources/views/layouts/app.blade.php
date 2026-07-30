@@ -63,6 +63,7 @@
         /* ── ALERT ── */
         .alert-success { background:#dcfce7; border-left:4px solid #22c55e; color:#166534; padding:12px 16px; border-radius:8px; margin-bottom:20px; font-size:14px; }
         .alert-error   { background:#fef2f2; border-left:4px solid #ef4444; color:#991b1b; padding:12px 16px; border-radius:8px; margin-bottom:20px; font-size:14px; }
+        .alert-info    { background:#eff6ff; border-left:4px solid #3b82f6; color:#1e40af; padding:12px 16px; border-radius:8px; margin-bottom:20px; font-size:14px; }
 
         /* ── PAGE HEADER ── */
         .page-header { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:24px; }
@@ -365,10 +366,10 @@
     </div>
     @endauth
 
-    {{-- Logika Filter Sidebar Otomatis --}}
-    @if(request()->routeIs('admin.*'))
+    {{-- Logika Sidebar Berdasarkan Role Pengguna --}}
+    @if(Auth::check() && Auth::user()->isAdmin())
         
-        {{-- JIKA DI HALAMAN ADMIN: Tampilkan menu navigasi Administrator --}}
+        {{-- JIKA ROLE = ADMINISTRATOR: Tampilkan HANYA menu administrasi --}}
         <div class="sidebar-label" style="color:#7c3aed;">Administrasi</div>
 
         <a href="{{ route('admin.dashboard', ['section' => 'threshold']) }}"
@@ -386,14 +387,9 @@
             <i data-feather="clock"></i> Riwayat
         </a>
 
-        <hr class="sidebar-divider">
-        <a href="{{ route('dashboard') }}" style="font-size:13px;">
-            <i data-feather="arrow-left"></i> Dashboard Utama
-        </a>
-
     @else
         
-        {{-- JIKA DI HALAMAN UTAMA (PETANI): Tampilkan menu monitoring lengkap --}}
+        {{-- JIKA ROLE = USER / PETANI: Tampilkan HANYA menu utama petani --}}
         <div class="sidebar-label">Menu Utama</div>
 
         <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
@@ -408,23 +404,6 @@
         <a href="{{ route('riwayat') }}" class="{{ request()->routeIs('riwayat') ? 'active' : '' }}">
             <i data-feather="clock"></i> Riwayat
         </a>
-
-        {{-- Akses Panel Admin di bawah menu petani (Hanya muncul jika user yang login adalah Admin) --}}
-        @auth
-        @if(Auth::user()->isAdmin())
-            <hr class="sidebar-divider">
-            <div class="sidebar-label" style="color:#7c3aed;">Administrasi</div>
-            <a href="{{ route('admin.dashboard', ['section' => 'threshold']) }}" class="admin-link">
-                <i data-feather="sliders"></i> Konfigurasi Threshold
-            </a>
-            <a href="{{ route('admin.dashboard', ['section' => 'users']) }}" class="admin-link">
-                <i data-feather="users"></i> Pengguna
-            </a>
-            <a href="{{ route('admin.riwayat') }}" class="admin-link">
-                <i data-feather="clock"></i> Riwayat
-            </a>
-        @endif
-        @endauth
 
     @endif
 
@@ -468,6 +447,11 @@
     {{-- Alert error --}}
     @if(session('error'))
         <div class="alert-error">🚫 {{ session('error') }}</div>
+    @endif
+
+    {{-- Alert info --}}
+    @if(session('info'))
+        <div class="alert-info">ℹ️ {{ session('info') }}</div>
     @endif
 
     {{-- Validation error dari form admin --}}
