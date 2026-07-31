@@ -332,11 +332,10 @@ class SensorController extends Controller
                 $isYoloOn = (strtoupper(trim((string)$fd->deteksi_yolo)) === 'ON');
                 $labelText = $isYoloOn ? 'ON - TIKUS TERDETEKSI PADA CITRA' : 'OFF - TIKUS TIDAK TERDETEKSI PADA CITRA';
                 $badgeBg = $isYoloOn ? '#dc2626' : '#16a34a';
-                $confidenceStr = ($fd->confidence_yolo !== null) ? ' (' . round($fd->confidence_yolo * 100) . '%)' : '';
 
                 $yoloBadge = '<span class="yolo-badge" style="position:absolute; top:4px; right:4px; background:' 
                            . $badgeBg . '; color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; z-index:5;">'
-                           . '🎯 ' . htmlspecialchars($labelText . $confidenceStr)
+                           . '🎯 ' . htmlspecialchars($labelText)
                            . '</span>';
             }
 

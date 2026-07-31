@@ -279,7 +279,6 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
                                 <span style="font-size:18px;">🎯</span>
                                 <div>
                                     <div style="font-size:12px; font-weight:600; color:var(--teks);">Deteksi Visual YOLO</div>
-                                    <div style="font-size:11px; color:var(--abu);">Confidence: <span id="dr-yolo-conf" style="font-family:'JetBrains Mono',monospace; font-weight:600;">{{ $isOnline ? ($latest->confidence_yolo ?? '--') : '--' }}</span></div>
                                 </div>
                             </div>
                             <span id="dr-yolo-badge" style="font-size:11px; font-weight:700; padding:4px 10px; border-radius:99px; background:#e2e8f0; color:#64748b;">--</span>
@@ -500,9 +499,6 @@ function fetchLatestCameraData() {
                 }
             }
 
-            var yoloConf = data.confidence_yolo ? (parseFloat(data.confidence_yolo) * 100).toFixed(0) + '%' : '--';
-            elSet('dr-yolo-conf', yoloConf);
-            
             var yoloBadge = document.getElementById('dr-yolo-badge');
             if (yoloBadge) {
                 var yStatus = data.hasil_deteksi_yolo || 'OFF';

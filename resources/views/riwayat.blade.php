@@ -72,7 +72,6 @@
                     <th>Nilai Fuzzy</th>
                     <th>Keputusan Sistem</th>
                     <th>Hasil Deteksi YOLO</th>
-                    <th>Confidence</th>
                     <th>Gambar</th>
                 </tr>
             </thead>
@@ -119,14 +118,6 @@
                     </td>
 
                     <td>
-                        @if($item->confidence_yolo)
-                            {{ number_format($item->confidence_yolo * 100, 2) }}%
-                        @else
-                            <span style="color:#cbd5e1; font-size:12px;">-</span>
-                        @endif
-                    </td>
-
-                    <td>
                         @if($item->image)
                             <a href="{{ asset('storage/'.$item->image) }}" target="_blank">
                                 <img src="{{ asset('storage/'.$item->image) }}"
@@ -142,7 +133,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">
+                    <td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">
                         📭 Belum ada data yang ditemukan
                     </td>
                 </tr>
