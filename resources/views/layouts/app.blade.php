@@ -349,7 +349,7 @@
 
 <div class="sidebar" id="appSidebar">
     <div class="sidebar-brand">
-        <span>🌽 SmartFarm<small>Monitoring Hama Jagung</small></span>
+        <span>🌽 SmartFarm</span>
     </div>
 
     @auth
