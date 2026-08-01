@@ -110,62 +110,16 @@ class MQTTSubscribe extends Command
                         Cache::put('iot_live_data', $cacheData, now()->addMinutes(7));
                         $this->info('Cache real-time berhasil diperbarui.');
 
-                        // Atomic Lock & 15-Minute Interval Check for DB Persistence (Shared Key with HTTP API)
-                        $lockAcquired = Cache::lock('sensor_periodic_db_save_lock', 10)->get(function () use ($suhu, $udara, $tanah, $nilai_fuzzy, $inputDeteksiYolo, $inputConfidenceYolo, $keputusanSistem) {
-                            // Source of truth: hanya ambil record sensor periodik (bukan insiden YOLO ON)
-                            $latestHistori = SensorReading::where(function ($q) {
-                                $q->whereNull('deteksi_yolo')->orWhere('deteksi_yolo', 'OFF');
-                            })->latest()->first();
+                        // Panggil Service Terpusat Penjaga Slot 15 Menit & Lock Atomic
+                        $saveRes = \App\Services\SensorHistoryService::savePeriodicIfDue(
+                            $suhu, $udara, $tanah, $nilai_fuzzy, $keputusanSistem,
+                            $inputDeteksiYolo, $inputConfidenceYolo, null, 'MQTT'
+                        );
 
-                            $shouldSave = true;
-                            $selisihMenit = 999;
-
-                            if ($latestHistori) {
-                                $selisihMenit = $latestHistori->created_at->diffInMinutes(now());
-                                if ($selisihMenit < 15) {
-                                    $shouldSave = false;
-                                }
-                            }
-
-                            if ($shouldSave) {
-                                $permanentPath = null;
-                                if (\Illuminate\Support\Facades\Storage::disk('public')->exists('kamera/latest_live.jpg')) {
-                                    $permanentFilename = 'kamera/periodic_' . time() . '_' . uniqid() . '.jpg';
-                                    \Illuminate\Support\Facades\Storage::disk('public')->copy('kamera/latest_live.jpg', $permanentFilename);
-                                    $permanentPath = $permanentFilename;
-                                }
-
-                                $sensor = SensorReading::create([
-                                    'suhu'             => $suhu,
-                                    'kelembapan_udara' => $udara,
-                                    'kelembapan_tanah' => $tanah,
-                                    'nilai_fuzzy'      => $nilai_fuzzy,
-                                    'image'            => $permanentPath,
-                                    'deteksi'          => $keputusanSistem,
-                                    'deteksi_yolo'     => $inputDeteksiYolo,
-                                    'confidence_yolo'  => $inputConfidenceYolo,
-                                ]);
-
-                                $this->info("Data BERHASIL disimpan ke Database (Interval 15 Menit)! ID: {$sensor->id}");
-
-                                if (in_array($keputusanSistem, ['HAMA', 'TINGGI', 'SEDANG'])) {
-                                    $lastNotif = Notification::where('status', $keputusanSistem)
-                                                             ->where('created_at', '>=', now()->subMinutes(15))
-                                                             ->first();
-
-                                    if (!$lastNotif) {
-                                        $controller = app(SensorController::class);
-                                        $controller->createNotification($keputusanSistem, round($nilai_fuzzy, 4), $sensor);
-                                        $this->info("Notifikasi {$keputusanSistem} dikirim!");
-                                    }
-                                }
-                            } else {
-                                $this->info("Penyimpanan DB dilewati (Selisih waktu: {$selisihMenit} menit < 15 menit).");
-                            }
-                        });
-
-                        if (!$lockAcquired) {
-                            $this->info('Penyimpanan DB dilewati (Lock sedang dipegang oleh proses subscriber lain).');
+                        if ($saveRes['status'] === 'stored') {
+                            $this->info("PERIODIC_SOURCE=MQTT | Data BERHASIL disimpan ke Database (Slot 15 Menit)! ID: {$saveRes['id']}");
+                        } else {
+                            $this->info("PERIODIC_SOURCE=MQTT | Penyimpanan DB dilewati (Reason: {$saveRes['status']}).");
                         }
 
                     } catch (\Throwable $e) {

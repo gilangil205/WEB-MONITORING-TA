@@ -535,40 +535,11 @@ class SensorController extends Controller
         }
 
         // Request non-YOLO (misal kiriman langsung sensor ESP32 via HTTP)
-        $isStored = false;
-        Cache::lock('sensor_periodic_db_save_lock', 10)->get(function () use ($suhu, $udara, $tanah, $nilaiFuzzy, $path, $keputusanSistem, $inputDeteksiYolo, $inputConfidenceYolo, &$isStored) {
-            // Source of truth: hanya ambil record sensor periodik (bukan insiden YOLO ON)
-            $latestHistori = SensorReading::where(function ($q) {
-                $q->whereNull('deteksi_yolo')->orWhere('deteksi_yolo', 'OFF');
-            })->latest()->first();
-
-            $shouldSave = true;
-
-            if ($latestHistori) {
-                $selisihMenit = $latestHistori->created_at->diffInMinutes(now());
-                if ($selisihMenit < 15) {
-                    $shouldSave = false;
-                }
-            }
-
-            if ($shouldSave) {
-                $sensor = SensorReading::create([
-                    'suhu'             => $suhu,
-                    'kelembapan_udara' => $udara,
-                    'kelembapan_tanah' => $tanah,
-                    'nilai_fuzzy'      => $nilaiFuzzy,
-                    'image'            => $path,
-                    'deteksi'          => $keputusanSistem,
-                    'deteksi_yolo'     => $inputDeteksiYolo,
-                    'confidence_yolo'  => $inputConfidenceYolo,
-                ]);
-
-                if (in_array($keputusanSistem, ['HAMA', 'TINGGI', 'SEDANG'])) {
-                    $this->createNotification($keputusanSistem, $nilaiFuzzy, $sensor);
-                }
-                $isStored = true;
-            }
-        });
+        $saveRes = \App\Services\SensorHistoryService::savePeriodicIfDue(
+            $suhu, $udara, $tanah, $nilaiFuzzy, $keputusanSistem,
+            $inputDeteksiYolo, $inputConfidenceYolo, $path, 'HTTP'
+        );
+        $isStored = ($saveRes['status'] === 'stored');
 
         return response()->json([
             'message'            => $isStored ? 'Data diproses & disimpan' : 'Data live diperbarui (Penyimpanan DB dilewati <15m)',
