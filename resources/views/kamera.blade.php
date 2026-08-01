@@ -142,56 +142,38 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
     </div>
 </div>
 
-<div class="mini-grid">
-    <div class="mini-card">
-        <span class="mc-icon">🌡️</span>
-        <div class="mc-info">
-            <div class="mc-label">Suhu Udara</div>
-            <div class="mc-val">
-                <span id="mini-suhu">{{ $isOnline ? ($latest->suhu ?? '--') : '--' }}</span>
-                <span style="font-size:13px;">°C</span>
-            </div>
-        </div>
+{{-- ── KARTU DATA LIVE (dari Cache IoT) ── --}}
+<div class="card-box">
+
+    <div class="card-item gradient-red">
+        <h4>🌡️ Suhu</h4>
+        <p><span id="mini-suhu">{{ $isOnline ? ($latest->suhu ?? '--') : '--' }}</span>°C</p>
+        <small>Data terkini IoT</small>
     </div>
 
-    <div class="mini-card">
-        <span class="mc-icon">💧</span>
-        <div class="mc-info">
-            <div class="mc-label">Kel. Udara</div>
-            <div class="mc-val">
-                <span id="mini-kel-udara">{{ $isOnline ? ($latest->kelembapan_udara ?? '--') : '--' }}</span>
-                <span style="font-size:13px;">%</span>
-            </div>
-        </div>
+    <div class="card-item gradient-blue">
+        <h4>💧 Kel. Udara</h4>
+        <p><span id="mini-kel-udara">{{ $isOnline ? ($latest->kelembapan_udara ?? '--') : '--' }}</span>%</p>
+        <small>Kelembapan udara</small>
     </div>
 
-    <div class="mini-card">
-        <span class="mc-icon">🌱</span>
-        <div class="mc-info">
-            <div class="mc-label">Kel. Tanah</div>
-            <div class="mc-val">
-                <span id="mini-kel-tanah">{{ $isOnline ? ($latest->kelembapan_tanah ?? '--') : '--' }}</span>
-                <span style="font-size:13px;">%</span>
-            </div>
-        </div>
+    <div class="card-item gradient-green">
+        <h4>🌱 Kel. Tanah</h4>
+        <p><span id="mini-kel-tanah">{{ $isOnline ? ($latest->kelembapan_tanah ?? '--') : '--' }}</span>%</p>
+        <small>Kelembapan tanah</small>
     </div>
 
-    <div id="mini-card-status" class="mini-card
-        @if(!$isOnline) mc-status-offline
-        @elseif($status=='HAMA') mc-status-hama
-        @elseif($status=='WASPADA' || $status=='SEDANG') mc-status-waspada
-        @else mc-status-aman
+    <div id="mini-card-status" class="card-item
+        @if(!$isOnline) status-offline
+        @elseif($status=='TINGGI' || $status=='HAMA') status-high
+        @elseif($status=='SEDANG' || $status=='WASPADA') status-medium
+        @else status-low
         @endif">
-        <span class="mc-icon" id="mini-icon-status">
-            @if(!$isOnline) 📡 @elseif($status=='HAMA') 🚨 @elseif($status=='WASPADA' || $status=='SEDANG') ⚠️ @else ✅ @endif
-        </span>
-        <div class="mc-info">
-            <div class="mc-label">Status Sistem</div>
-            <div class="mc-val" style="font-size:16px;" id="mini-val-status">
-                {{ $isOnline ? $status : 'OFFLINE' }}
-            </div>
-        </div>
+        <h4>⚠️ Tingkat Risiko Lingkungan (Fuzzy Sugeno)</h4>
+        <p id="mini-val-status">{{ $isOnline ? ($status=='HAMA' ? 'TINGGI' : ($status=='WASPADA' ? 'SEDANG' : ($status=='AMAN' ? 'RENDAH' : $status))) : 'OFFLINE' }}</p>
+        <small>Nilai Fuzzy: <span id="mini-fuzzy-val">{{ $isOnline ? number_format($nilai ?? 0, 3) : '--' }}</span></small>
     </div>
+
 </div>
 
 <style>
@@ -441,19 +423,18 @@ function fetchLatestCameraData() {
             elSet('detail-time',      data.formatted_time);
 
             var miniCard = document.getElementById('mini-card-status');
-            var miniIcon = document.getElementById('mini-icon-status');
             var miniVal  = document.getElementById('mini-val-status');
-            if (miniVal) miniVal.innerText = data.status;
+            var miniFuzzyVal = document.getElementById('mini-fuzzy-val');
+
+            var fuzzyStatusText = data.prediksi_sensor || (data.status === 'HAMA' ? 'TINGGI' : (data.status === 'WASPADA' ? 'SEDANG' : 'RENDAH'));
+            if (fuzzyStatusText === 'HAMA') fuzzyStatusText = 'TINGGI';
+            else if (fuzzyStatusText === 'WASPADA') fuzzyStatusText = 'SEDANG';
+            else if (fuzzyStatusText === 'AMAN') fuzzyStatusText = 'RENDAH';
+
+            if (miniVal) miniVal.innerText = fuzzyStatusText;
+            if (miniFuzzyVal) miniFuzzyVal.innerText = (parseFloat(data.nilai) || 0).toFixed(3);
             if (miniCard) {
-                miniCard.className = 'mini-card';
-                if      (data.status === 'HAMA')    miniCard.classList.add('mc-status-hama');
-                else if (data.status === 'WASPADA') miniCard.classList.add('mc-status-waspada');
-                else                                miniCard.classList.add('mc-status-aman');
-            }
-            if (miniIcon) {
-                if      (data.status === 'HAMA')    miniIcon.innerText = '🚨';
-                else if (data.status === 'WASPADA') miniIcon.innerText = '⚠️';
-                else                                miniIcon.innerText = '✅';
+                miniCard.className = 'card-item ' + (fuzzyStatusText === 'TINGGI' ? 'status-high' : (fuzzyStatusText === 'SEDANG' ? 'status-medium' : 'status-low'));
             }
 
             var cw = document.getElementById('cam-content-wrapper');
@@ -591,11 +572,11 @@ function setKameraOffline() {
     if (yoloBadge) { yoloBadge.innerText = 'OFFLINE'; yoloBadge.style.background = '#e2e8f0'; yoloBadge.style.color = '#64748b'; }
 
     var miniCard = document.getElementById('mini-card-status');
-    var miniIcon = document.getElementById('mini-icon-status');
     var miniVal  = document.getElementById('mini-val-status');
-    if (miniCard) miniCard.className = 'mini-card mc-status-offline';
-    if (miniIcon) miniIcon.innerText = '📡';
+    var miniFuzzyVal = document.getElementById('mini-fuzzy-val');
+    if (miniCard) miniCard.className = 'card-item status-offline';
     if (miniVal)  miniVal.innerText  = 'OFFLINE';
+    if (miniFuzzyVal) miniFuzzyVal.innerText = '--';
 
     var cw = document.getElementById('cam-content-wrapper');
     if (cw) cw.innerHTML =

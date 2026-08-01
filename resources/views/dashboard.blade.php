@@ -23,153 +23,127 @@
     ⚠️ Perangkat IoT terputus — menampilkan data historis terakhir. Card sensor akan kosong hingga alat kembali online.
 </div>
 
-{{-- ── 2 KOTAK STATUS (KESEHATAN TANAH & STATUS PREDIKSI HAMA) ── --}}
-<div class="top-status-grid" style="gap:16px; margin-bottom:20px;">
+{{-- ── 2 KOTAK STATUS (KESEHATAN TANAH & KEPUTUSAN SISTEM AKHIR) ── --}}
+<div class="top-status-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:18px; margin-bottom:20px;">
     
     {{-- Kotak 1: Kesehatan Tanah --}}
-    <div id="live-water-card" class="panel" style="border-left:4px solid 
-        @if(!$isOnline) #94a3b8
-        @elseif($waterClass == 'status-critical') #dc2626
-        @elseif($waterClass == 'status-warning') #f59e0b
-        @else #22c55e
-        @endif;">
-        <div class="panel-header">
-            <div class="panel-title">🌱 Kesehatan Tanah</div>
-            <span id="live-water-kelembapan" style="font-size:12px; color:#64748b; @if(!$isOnline) display:none; @endif">
-                Kelembapan: <span id="live-water-kelembapan-val">{{ $isOnline ? number_format($waterTanah, 1) : '--' }}</span>%
+    <div id="live-water-card" class="card-item 
+        @if(!$isOnline) status-offline
+        @elseif($waterClass == 'status-critical') status-high
+        @elseif($waterClass == 'status-warning') status-medium
+        @else status-low
+        @endif" style="padding:20px;">
+        
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <h4 style="margin:0; font-size:13px; font-weight:600; opacity:0.95; color:white;">🌱 Kesehatan Tanah</h4>
+            <span id="live-water-kelembapan" style="font-size:12px; opacity:0.85; color:white; @if(!$isOnline) display:none; @endif">
+                Kelembapan: <span id="live-water-kelembapan-val" style="font-weight:700;">{{ $isOnline ? number_format($waterTanah, 1) : '--' }}</span>%
             </span>
         </div>
-        <div class="panel-body">
-            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+
+        <div style="font-size:24px; font-weight:800; line-height:1.2; margin-bottom:8px; color:white;">
+            <span id="live-water-text">
                 @if(!$isOnline)
-                    <span id="live-water-text" style="font-size:24px; font-weight:700; color:#94a3b8;">
-                        📡 OFFLINE
-                    </span>
-                    <span id="live-water-rek" style="font-size:13px; color:#475569;">Menunggu koneksi IoT...</span>
+                    📡 OFFLINE
                 @else
-                    <span id="live-water-text" style="font-size:24px; font-weight:700; color:{{ $waterClass == 'status-critical' ? '#dc2626' : ($waterClass == 'status-warning' ? '#f59e0b' : '#22c55e') }};">
-                        {{ $waterStatus }}
-                    </span>
-                    <span id="live-water-rek" style="font-size:13px; color:#475569;">{{ $waterRecommendation }}</span>
+                    {{ $waterStatus }}
                 @endif
-            </div>
+            </span>
         </div>
+
+        <small id="live-water-rek" style="font-size:12px; opacity:0.9; color:white; display:block; line-height:1.5;">
+            @if(!$isOnline)
+                Menunggu koneksi IoT...
+            @else
+                {{ $waterRecommendation }}
+            @endif
+        </small>
     </div>
 
-    {{-- Kotak 2: Status Prediksi Hama (dipindahkan dari grid sensor) --}}
-    <div id="live-status-card" class="panel" style="border-left:4px solid 
-        @if(!$isOnline) #94a3b8
-        @elseif($status=='HAMA') #dc2626
-        @elseif($status=='WASPADA') #f59e0b
-        @else #22c55e
-        @endif;">
-        <div class="panel-header">
-            <div class="panel-title">🧮 Keputusan Sistem Akhir</div>
-            <span style="font-size:12px; color:#64748b;">Nilai Fuzzy: <span id="live-fuzzy-val-header">{{ $isOnline ? number_format($nilai, 3) : '--' }}</span></span>
+    {{-- Kotak 2: Keputusan Sistem Akhir --}}
+    <div id="live-status-card" class="card-item 
+        @if(!$isOnline) status-offline
+        @elseif($status=='HAMA' || $status=='TINGGI') status-high
+        @elseif($status=='SEDANG' || $status=='WASPADA') status-medium
+        @else status-low
+        @endif" style="padding:20px;">
+        
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <h4 style="margin:0; font-size:13px; font-weight:600; opacity:0.95; color:white;">
+                <span id="live-status-icon">
+                    @if(!$isOnline) 📡 @elseif($status=='HAMA') 🚨 @elseif($status=='WASPADA') ⚠️ @else ✅ @endif
+                </span> Keputusan Sistem Akhir
+            </h4>
+            <span style="font-size:12px; opacity:0.85; color:white;">
+                Nilai Fuzzy: <span id="live-fuzzy-val-header" style="font-weight:700;">{{ $isOnline ? number_format($nilai, 3) : '--' }}</span>
+            </span>
         </div>
-        <div class="panel-body" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-            <span class="sc-icon" id="live-status-icon" style="font-size:28px;">
-                @if(!$isOnline) 📡
-                @elseif($status=='HAMA') 🚨
-                @elseif($status=='WASPADA') ⚠️
-                @else ✅
+
+        <div style="font-size:24px; font-weight:800; line-height:1.2; margin-bottom:8px; color:white;">
+            <span id="live-status-text">
+                @if(!$isOnline)
+                    Offline
+                @elseif($status=='HAMA')
+                    Hama Terdeteksi!
+                @elseif($status=='TINGGI')
+                    Risiko Tinggi
+                @elseif($status=='SEDANG' || $status=='WASPADA')
+                    Risiko Sedang
+                @else
+                    Risiko Rendah
                 @endif
             </span>
-            <div>
-                <div style="font-size:24px; font-weight:700; color:{{ $isOnline ? ($status=='HAMA' ? '#dc2626' : ($status=='WASPADA' ? '#f59e0b' : '#22c55e')) : '#94a3b8' }};">
-                    <span id="live-status-text">
-                        @if(!$isOnline) Offline
-                        @elseif($status=='HAMA') Hama Terdeteksi!
-                        @elseif($status=='TINGGI') Risiko Tinggi
-                        @elseif($status=='SEDANG' || $status=='WASPADA') Risiko Sedang
-                        @else Risiko Rendah
-                        @endif
-                    </span>
-                </div>
-                <div>
-                    <span id="live-status-badge-besar" class="status-badge-besar
-                        @if(!$isOnline) badge-offline
-                        @elseif($status=='HAMA' || $status=='TINGGI') badge-hama
-                        @elseif($status=='SEDANG' || $status=='WASPADA') badge-waspada
-                        @else badge-aman
-                        @endif">
-                        @if(!$isOnline)
-                            OFFLINE
-                        @else
-                            Keputusan Akhir: {{ $status == 'HAMA' ? 'HAMA TERDETEKSI' : ($status == 'TINGGI' ? 'RISIKO LINGKUNGAN TINGGI' : ($status == 'SEDANG' || $status == 'WASPADA' ? 'RISIKO LINGKUNGAN SEDANG' : 'RISIKO LINGKUNGAN RENDAH')) }}
-                        @endif
-                    </span>
-                </div>
-            </div>
         </div>
+
+        <small id="live-status-subtext" style="font-size:12px; opacity:0.9; color:white; display:block; line-height:1.5;">
+            @if(!$isOnline)
+                Perangkat IoT sedang tidak terhubung.
+            @elseif($status=='HAMA')
+                Tikus terdeteksi pada citra kamera dan kondisi lingkungan berisiko.
+            @elseif($status=='TINGGI')
+                Kondisi suhu & kelembapan mendukung perkembangan hama.
+            @elseif($status=='SEDANG' || $status=='WASPADA')
+                Kondisi lingkungan berada pada tingkat waspada.
+            @else
+                Kondisi lingkungan tanaman jagung dalam batas aman.
+            @endif
+        </small>
+        
+        <span id="live-status-badge-besar" style="display:none;"></span>
     </div>
 
 </div>
 
-{{-- ── KARTU SENSOR (3 CARD: SUHU, UDARA, TANAH) ── --}}
-<div class="sensor-grid" style="grid-template-columns:repeat(3,1fr);">
+{{-- ── KARTU DATA LIVE (dari Cache IoT) ── --}}
+<div class="card-box">
 
-    {{-- Suhu --}}
-    <div class="sensor-card suhu">
-        <span class="sc-icon">🌡️</span>
-        <div class="sc-label">Suhu Udara</div>
-        <div class="sc-value">
-            <span id="live-suhu">{{ $isOnline ? ($latest->suhu ?? '--') : '--' }}</span>
-            <span style="font-size:18px">°C</span>
-        </div>
-        <div class="sc-sub" id="live-suhu-sub">
-            @if($isOnline && $latest)
-                @php $s = $latest->suhu ?? 0; @endphp
-                @if($s >= 30) Kondisi panas — mendukung hama
-                @elseif($s >= 22) Kondisi hangat — perlu pantau
-                @else Kondisi dingin — relatif aman
-                @endif
-            @else
-                Menunggu data dari alat IoT...
-            @endif
-        </div>
+    <div class="card-item gradient-red">
+        <h4>🌡️ Suhu</h4>
+        <p><span id="live-suhu">{{ $isOnline ? ($latest->suhu ?? '--') : '--' }}</span>°C</p>
+        <small id="live-suhu-sub">Data terkini IoT</small>
     </div>
 
-    {{-- Kelembapan Udara --}}
-    <div class="sensor-card udara">
-        <span class="sc-icon">💧</span>
-        <div class="sc-label">Kelembapan Udara</div>
-        <div class="sc-value">
-            <span id="live-udara">{{ $isOnline ? ($latest->kelembapan_udara ?? '--') : '--' }}</span>
-            <span style="font-size:18px">%</span>
-        </div>
-        <div class="sc-sub" id="live-udara-sub">
-            @if($isOnline && $latest)
-                @php $u = $latest->kelembapan_udara ?? 0; @endphp
-                @if($u >= 78) Udara sangat lembap — risiko tinggi
-                @elseif($u >= 60) Udara normal
-                @else Udara kering — risiko rendah
-                @endif
-            @else
-                Menunggu data dari alat IoT...
-            @endif
-        </div>
+    <div class="card-item gradient-blue">
+        <h4>💧 Kel. Udara</h4>
+        <p><span id="live-udara">{{ $isOnline ? ($latest->kelembapan_udara ?? '--') : '--' }}</span>%</p>
+        <small id="live-udara-sub">Kelembapan udara</small>
     </div>
 
-    {{-- Kelembapan Tanah --}}
-    <div class="sensor-card tanah">
-        <span class="sc-icon">🌱</span>
-        <div class="sc-label">Kelembapan Tanah</div>
-        <div class="sc-value">
-            <span id="live-tanah">{{ $isOnline ? ($latest->kelembapan_tanah ?? '--') : '--' }}</span>
-            <span style="font-size:18px">%</span>
-        </div>
-        <div class="sc-sub" id="live-tanah-sub">
-            @if($isOnline && $latest)
-                @php $t = $latest->kelembapan_tanah ?? 0; @endphp
-                @if($t >= 65) Tanah lembap — perlu waspada
-                @elseif($t >= 40) Kelembapan tanah normal
-                @else Tanah kering — risiko rendah
-                @endif
-            @else
-                Menunggu data dari alat IoT...
-            @endif
-        </div>
+    <div class="card-item gradient-green">
+        <h4>🌱 Kel. Tanah</h4>
+        <p><span id="live-tanah">{{ $isOnline ? ($latest->kelembapan_tanah ?? '--') : '--' }}</span>%</p>
+        <small id="live-tanah-sub">Kelembapan tanah</small>
+    </div>
+
+    <div id="dash-status-card" class="card-item
+        @if(!$isOnline) status-offline
+        @elseif($status=='TINGGI' || $status=='HAMA') status-high
+        @elseif($status=='SEDANG' || $status=='WASPADA') status-medium
+        @else status-low
+        @endif">
+        <h4>⚠️ Tingkat Risiko Lingkungan (Fuzzy Sugeno)</h4>
+        <p id="dash-status-text">{{ $isOnline ? ($status=='HAMA' ? 'TINGGI' : ($status=='WASPADA' ? 'SEDANG' : ($status=='AMAN' ? 'RENDAH' : $status))) : 'OFFLINE' }}</p>
+        <small>Nilai Fuzzy: <span id="dash-fuzzy-val">{{ $isOnline ? number_format($nilai, 3) : '--' }}</span></small>
     </div>
 
 </div>
@@ -439,23 +413,36 @@
 
                 if (fuzzyValHeader) fuzzyValHeader.innerText = nilaiFuzzy.toFixed(3);
 
+                // Update 4th Fuzzy Sugeno card-box card
+                var dashCard  = document.getElementById('dash-status-card');
+                var dashText  = document.getElementById('dash-status-text');
+                var dashFuzzy = document.getElementById('dash-fuzzy-val');
+
+                if (dashFuzzy) dashFuzzy.innerText = nilaiFuzzy.toFixed(3);
+                if (dashText) {
+                    dashText.innerText = (statusHama === 'HAMA' || statusHama === 'TINGGI') ? 'TINGGI' : ((statusHama === 'SEDANG' || statusHama === 'WASPADA') ? 'SEDANG' : 'RENDAH');
+                }
+                if (dashCard) {
+                    dashCard.className = 'card-item ' + ((statusHama === 'HAMA' || statusHama === 'TINGGI') ? 'status-high' : ((statusHama === 'SEDANG' || statusHama === 'WASPADA') ? 'status-medium' : 'status-low'));
+                }
+
                 if (statusHama === 'HAMA') {
-                    if (statusCard)  statusCard.style.borderLeftColor = '#dc2626';
+                    if (statusCard)  statusCard.className = 'card-item status-high';
                     if (statusIcon)  statusIcon.innerText  = '🚨';
                     if (statusText)  statusText.innerText  = 'Hama Terdeteksi!';
                     if (statusBadge) { statusBadge.className = 'status-badge-besar badge-hama'; statusBadge.innerText = 'Keputusan Akhir: HAMA TERDETEKSI'; }
                 } else if (statusHama === 'TINGGI') {
-                    if (statusCard)  statusCard.style.borderLeftColor = '#dc2626';
+                    if (statusCard)  statusCard.className = 'card-item status-high';
                     if (statusIcon)  statusIcon.innerText  = '⚠️';
                     if (statusText)  statusText.innerText  = 'Risiko Tinggi';
                     if (statusBadge) { statusBadge.className = 'status-badge-besar badge-hama'; statusBadge.innerText = 'Keputusan Akhir: RISIKO LINGKUNGAN TINGGI'; }
                 } else if (statusHama === 'SEDANG' || statusHama === 'WASPADA') {
-                    if (statusCard)  statusCard.style.borderLeftColor = '#f59e0b';
+                    if (statusCard)  statusCard.className = 'card-item status-medium';
                     if (statusIcon)  statusIcon.innerText  = '⚠️';
                     if (statusText)  statusText.innerText  = 'Risiko Sedang';
                     if (statusBadge) { statusBadge.className = 'status-badge-besar badge-waspada'; statusBadge.innerText = 'Keputusan Akhir: RISIKO LINGKUNGAN SEDANG'; }
                 } else {
-                    if (statusCard)  statusCard.style.borderLeftColor = '#22c55e';
+                    if (statusCard)  statusCard.className = 'card-item status-low';
                     if (statusIcon)  statusIcon.innerText  = '✅';
                     if (statusText)  statusText.innerText  = 'Risiko Rendah';
                     if (statusBadge) { statusBadge.className = 'status-badge-besar badge-aman'; statusBadge.innerText = 'Keputusan Akhir: RISIKO LINGKUNGAN RENDAH'; }
@@ -511,8 +498,10 @@
                     wRek = 'Suhu rendah dan tanah basah. Kurangi penyiraman.';
                 }
 
-                if (waterCard) waterCard.style.borderLeftColor = wColor;
-                if (waterText) { waterText.innerText = wStatus; waterText.style.color = wColor; }
+                if (waterCard) {
+                    waterCard.className = 'card-item ' + ((wColor === '#dc2626') ? 'status-high' : ((wColor === '#f59e0b') ? 'status-medium' : 'status-low'));
+                }
+                if (waterText) { waterText.innerText = wStatus; waterText.style.color = '#ffffff'; }
                 if (waterRek) waterRek.innerText = wRek;
 
                 // Update fuzzy meter
@@ -584,10 +573,18 @@
 
         if (fuzzyValHeader) fuzzyValHeader.innerText = '--';
 
-        if (statusCard)  statusCard.style.borderLeftColor = '#94a3b8';
+        if (statusCard)  statusCard.className = 'card-item status-offline';
         if (statusIcon)  statusIcon.innerText  = '📡';
-        if (statusText)  statusText.innerText  = 'Offline';
+        if (statusText)  statusText.innerText  = 'OFFLINE';
         if (statusBadge) { statusBadge.className = 'status-badge-besar badge-offline'; statusBadge.innerText = 'OFFLINE'; }
+
+        // Update 4th Fuzzy Sugeno card-box card offline
+        var dashCard  = document.getElementById('dash-status-card');
+        var dashText  = document.getElementById('dash-status-text');
+        var dashFuzzy = document.getElementById('dash-fuzzy-val');
+        if (dashText)  dashText.innerText = 'OFFLINE';
+        if (dashFuzzy) dashFuzzy.innerText = '--';
+        if (dashCard)  dashCard.className = 'card-item status-offline';
 
         // Update Kesehatan Tanah card
         var waterCard = document.getElementById('live-water-card');
@@ -595,8 +592,8 @@
         var waterRek = document.getElementById('live-water-rek');
         var waterKelembapan = document.getElementById('live-water-kelembapan');
 
-        if (waterCard) waterCard.style.borderLeftColor = '#94a3b8';
-        if (waterText) { waterText.innerText = '📡 OFFLINE'; waterText.style.color = '#94a3b8'; }
+        if (waterCard) waterCard.className = 'card-item status-offline';
+        if (waterText) { waterText.innerText = '📡 OFFLINE'; waterText.style.color = '#ffffff'; }
         if (waterRek) waterRek.innerText = 'Menunggu koneksi IoT...';
         if (waterKelembapan) waterKelembapan.style.display = 'none';
 
