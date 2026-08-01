@@ -108,7 +108,10 @@ class MQTTSubscribe extends Command
 
                         // Simpan ke Cache setiap data MQTT masuk (validasi alat online per 7 menit)
                         Cache::put('iot_live_data', $cacheData, now()->addMinutes(7));
-                        $this->info('Cache real-time berhasil diperbarui.');
+                        
+                        $this->info("--------------------------------------------------");
+                        $this->info("MQTT_PAYLOAD_RECEIVED");
+                        $this->info("LIVE_CACHE_UPDATED");
 
                         // Panggil Service Terpusat Penjaga Slot 15 Menit & Lock Atomic
                         $saveRes = \App\Services\SensorHistoryService::savePeriodicIfDue(
@@ -116,11 +119,29 @@ class MQTTSubscribe extends Command
                             $inputDeteksiYolo, $inputConfidenceYolo, null, 'MQTT'
                         );
 
-                        if ($saveRes['status'] === 'stored') {
-                            $this->info("PERIODIC_SOURCE=MQTT | Data BERHASIL disimpan ke Database (Slot 15 Menit)! ID: {$saveRes['id']}");
+                        if ($saveRes['lock_acquired']) {
+                            $this->info("LOCK_ACQUIRED");
                         } else {
-                            $this->info("PERIODIC_SOURCE=MQTT | Penyimpanan DB dilewati (Reason: {$saveRes['status']}).");
+                            $this->warn("LOCK_NOT_ACQUIRED");
                         }
+
+                        $this->line("TOTAL_SENSOR_RECORDS_BEFORE=" . $saveRes['total_sensor_records_before']);
+                        $this->line("LAST_PERIODIC_RECORD_ID=" . ($saveRes['last_periodic_record_id'] ?? 'NULL'));
+                        $this->line("LAST_PERIODIC_CREATED_AT=" . ($saveRes['last_periodic_created_at'] ?? 'NULL'));
+                        $this->line("CURRENT_TIME=" . $saveRes['current_time']);
+                        $this->line("DIFFERENCE_MINUTES=" . ($saveRes['difference_minutes'] ?? '999'));
+                        $this->line("CURRENT_15_MINUTE_SLOT=" . ($saveRes['current_15_minute_slot'] ?? 'NONE'));
+                        $this->line("PERIODIC_RECORD_EXISTS_IN_SLOT=" . ($saveRes['periodic_record_exists_in_slot'] ? 'YES' : 'NO'));
+                        $this->line("SAVE_DECISION=" . $saveRes['save_decision']);
+
+                        if ($saveRes['status'] === 'stored') {
+                            $this->info("STORED_RECORD_ID=" . $saveRes['id']);
+                        } elseif ($saveRes['status'] === 'insert_error') {
+                            $this->error("INSERT_ERROR=" . $saveRes['insert_error']);
+                        } else {
+                            $this->line("PERIODIC_SAVE_SKIPPED (" . $saveRes['status'] . ")");
+                        }
+                        $this->info("--------------------------------------------------");
 
                     } catch (\Throwable $e) {
                         $this->error("⚠️ Error memproses payload MQTT: " . $e->getMessage());

@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\SensorReading;
 
 class MQTTStatus extends Command
@@ -17,13 +19,49 @@ class MQTTStatus extends Command
         $this->info("                        DIAGNOSTIK READ-ONLY STATUS MQTT & SENSOR (SMARTFARM)                           ");
         $this->info("=========================================================================================================\n");
 
-        // 1. APP_ENV & CACHE DRIVER
+        // 1. APP_ENV, CACHE DRIVER & DATABASE RUNTIME AUDIT
         $appEnv = env('APP_ENV', config('app.env', 'production'));
         $cacheDriver = config('cache.default', 'file');
 
-        $this->line("<comment>1. LINGKUNGAN APLIKASI & DRIVER CACHE:</comment>");
-        $this->line("   - APP_ENV      : <info>{$appEnv}</info>");
-        $this->line("   - Cache Driver : <info>{$cacheDriver}</info>\n");
+        $dbDefault = config('database.default');
+        $dbDriver = 'UNKNOWN';
+        $dbName = 'UNKNOWN';
+        $dbHost = 'UNKNOWN';
+
+        try {
+            $dbDriver = DB::connection()->getDriverName();
+            $dbName   = DB::connection()->getDatabaseName();
+            $rawHost  = config("database.connections.{$dbDefault}.host", 'localhost');
+            $dbHost   = (strlen($rawHost) > 4) ? substr($rawHost, 0, 3) . '***' : 'local';
+        } catch (\Throwable $e) {
+            $dbDriver = "ERROR: " . $e->getMessage();
+        }
+
+        $tableExists = Schema::hasTable('sensor_readings');
+        $totalRecords = $tableExists ? SensorReading::count() : 0;
+
+        $migrationStatus = 'Belum Ada';
+        try {
+            if (Schema::hasTable('migrations')) {
+                $mig = DB::table('migrations')->where('migration', 'like', '%sensor_readings%')->first();
+                if ($mig) {
+                    $migrationStatus = "Migrated (Batch {$mig->batch})";
+                }
+            }
+        } catch (\Throwable $e) {
+            $migrationStatus = "Error: " . $e->getMessage();
+        }
+
+        $this->line("<comment>1. LINGKUNGAN APLIKASI & DATABASE RUNTIME:</comment>");
+        $this->line("   - APP_ENV          : <info>{$appEnv}</info>");
+        $this->line("   - Cache Driver     : <info>{$cacheDriver}</info>");
+        $this->line("   - DB Connection    : <info>{$dbDefault}</info>");
+        $this->line("   - DB Driver        : <info>{$dbDriver}</info>");
+        $this->line("   - DB Database Name : <info>{$dbName}</info>");
+        $this->line("   - DB Host (Masked) : <info>{$dbHost}</info>");
+        $this->line("   - Tabel Exists     : " . ($tableExists ? "<info>YA (Tabel 'sensor_readings' tersedia)</info>" : "<error>TIDAK DITEMUKAN</error>"));
+        $this->line("   - Migration Status : <info>{$migrationStatus}</info>");
+        $this->line("   - Total Record DB  : <info>{$totalRecords} record</info>\n");
 
         // 2. CACHE IOT_LIVE_DATA
         $this->line("<comment>2. STATUS CACHE LIVE DATA ('iot_live_data'):</comment>");
@@ -43,7 +81,7 @@ class MQTTStatus extends Command
 
         // 3. 15 RECORD TERAKHIR TABEL SENSOR_READINGS
         $this->line("<comment>3. LIMA BELAS (15) RECORD SENSOR_READINGS TERBARU:</comment>");
-        $records = SensorReading::orderBy('id', 'desc')->take(15)->get();
+        $records = $tableExists ? SensorReading::orderBy('id', 'desc')->take(15)->get() : collect();
 
         if ($records->isNotEmpty()) {
             $this->table(
@@ -63,14 +101,14 @@ class MQTTStatus extends Command
                 })
             );
         } else {
-            $this->warn("   [!] Tidak ada record dalam tabel sensor_readings.\n");
+            $this->warn("   [!] Tabel 'sensor_readings' masih KOSONG (0 record).\n");
         }
 
         // 4. KELOMPOK RECORD SENSOR PERIODIK DALAM SLOT 15 MENIT YANG SAMA
         $this->line("\n<comment>4. AUDIT SLOT 15 MENIT PENYIMPANAN SENSOR PERIODIK:</comment>");
-        $periodicRecords = SensorReading::where(function ($q) {
+        $periodicRecords = $tableExists ? SensorReading::where(function ($q) {
             $q->whereNull('deteksi_yolo')->orWhere('deteksi_yolo', 'OFF');
-        })->orderBy('id', 'desc')->take(20)->get();
+        })->orderBy('id', 'desc')->take(20)->get() : collect();
 
         if ($periodicRecords->isNotEmpty()) {
             $slots = [];
@@ -111,7 +149,7 @@ class MQTTStatus extends Command
                 $tableData
             );
         } else {
-            $this->warn("   [!] Tidak ada record sensor periodik ditemukan.");
+            $this->warn("   [!] Tidak ada record sensor periodik ditemukan (Tabel masih kosong).");
         }
 
         // 5. TEST ATOMIC LOCK (READ-ONLY GET & IMMEDIATE RELEASE)
