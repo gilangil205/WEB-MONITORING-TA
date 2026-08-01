@@ -8,7 +8,6 @@
 <div class="page-header">
     <div>
         <h1>📊 Analisis Risiko Lingkungan dan Deteksi Hama</h1>
-        <p>Proyeksi tingkat risiko lingkungan 3 periode ke depan berdasarkan tren iklim mikro — Metode Fuzzy Sugeno</p>
     </div>
     <div class="update-badge">
         <span class="dot"></span>

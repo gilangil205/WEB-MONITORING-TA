@@ -131,7 +131,6 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
 <div class="page-header">
     <div>
         <h1>📷 Monitoring Visual Tanaman Jagung</h1>
-        <p>Pemantauan visual tanaman jagung secara real-time disertai analisis risiko lingkungan menggunakan Fuzzy Sugeno dan deteksi hama menggunakan YOLO.</p>
     </div>
     <div id="header-pill">
         @if($isOnline)
@@ -192,9 +191,6 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
     <div class="panel kamera-main-panel">
         <div class="panel-header">
             <div class="panel-title">📸 Kamera Lapangan — Tanaman Jagung</div>
-            <span style="font-size:11px; color:var(--abu); font-family:'JetBrains Mono',monospace;">
-                Refresh otomatis / 5 detik
-            </span>
         </div>
         <div class="panel-body">
 
@@ -211,11 +207,6 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
                         <span style="font-size:11px; opacity:0.6;">Gambar akan tampil saat sensor mengirim data</span>
                     </div>
                 </div>
-            </div>
-
-            <div class="refresh-info">
-                <div class="refresh-spin"></div>
-                <span>Data sensor diperbarui otomatis setiap 5 detik dari perangkat IoT ESP32-CAM</span>
             </div>
 
             <!-- INFORMASI STATUS KAMERA -->
@@ -241,7 +232,7 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
                 <!-- DECISION RULE BREAKDOWN -->
                 <div class="decision-rule-container" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-bottom:16px;">
                     <div style="font-size:12px; font-weight:700; color:var(--abu); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">Evaluasi Decision Rule</div>
-                    
+
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         <!-- Prediksi Sensor -->
                         <div style="display:flex; justify-space-between; align-items:center; padding:10px 12px; background:white; border-radius:8px; border:1px solid #f1f5f9;">
@@ -462,7 +453,7 @@ function fetchLatestCameraData() {
             // Update Decision Rule Breakdown
             var fuzzyVal = parseFloat(data.nilai) || 0;
             elSet('dr-fuzzy-skor', fuzzyVal.toFixed(4));
-            
+
             var predBadge = document.getElementById('dr-prediksi-badge');
             if (predBadge) {
                 var pVal = data.prediksi_sensor || 'RENDAH';
@@ -564,10 +555,10 @@ function setKameraOffline() {
     ['detail-suhu','detail-kel-udara','detail-kel-tanah','detail-time','dr-fuzzy-skor','dr-yolo-conf'].forEach(function(id) {
         var e = document.getElementById(id); if (e) e.innerText = '--';
     });
-    
+
     var predBadge = document.getElementById('dr-prediksi-badge');
     if (predBadge) { predBadge.innerText = 'OFFLINE'; predBadge.style.background = '#e2e8f0'; predBadge.style.color = '#64748b'; }
-    
+
     var yoloBadge = document.getElementById('dr-yolo-badge');
     if (yoloBadge) { yoloBadge.innerText = 'OFFLINE'; yoloBadge.style.background = '#e2e8f0'; yoloBadge.style.color = '#64748b'; }
 

@@ -8,7 +8,6 @@
 <div class="page-header">
     <div>
         <h1>🌽 Dashboard Monitoring Hama Jagung</h1>
-        <p>Sistem Deteksi &amp; Prediksi Serangan Hama Berbasis IoT — Metode Fuzzy Sugeno</p>
     </div>
     <div class="update-badge">
         <span class="dot" id="live-dot-header"></span>
@@ -25,15 +24,15 @@
 
 {{-- ── 2 KOTAK STATUS (KESEHATAN TANAH & KEPUTUSAN SISTEM AKHIR) ── --}}
 <div class="top-status-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:18px; margin-bottom:20px;">
-    
+
     {{-- Kotak 1: Kesehatan Tanah --}}
-    <div id="live-water-card" class="card-item 
+    <div id="live-water-card" class="card-item
         @if(!$isOnline) status-offline
         @elseif($waterClass == 'status-critical') status-high
         @elseif($waterClass == 'status-warning') status-medium
         @else status-low
         @endif" style="padding:20px;">
-        
+
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
             <h4 style="margin:0; font-size:13px; font-weight:600; opacity:0.95; color:white;">🌱 Kesehatan Tanah</h4>
             <span id="live-water-kelembapan" style="font-size:12px; opacity:0.85; color:white; @if(!$isOnline) display:none; @endif">
@@ -61,13 +60,13 @@
     </div>
 
     {{-- Kotak 2: Keputusan Sistem Akhir --}}
-    <div id="live-status-card" class="card-item 
+    <div id="live-status-card" class="card-item
         @if(!$isOnline) status-offline
         @elseif($status=='HAMA' || $status=='TINGGI') status-high
         @elseif($status=='SEDANG' || $status=='WASPADA') status-medium
         @else status-low
         @endif" style="padding:20px;">
-        
+
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
             <h4 style="margin:0; font-size:13px; font-weight:600; opacity:0.95; color:white;">
                 <span id="live-status-icon">
@@ -108,7 +107,7 @@
                 Kondisi lingkungan tanaman jagung dalam batas aman.
             @endif
         </small>
-        
+
         <span id="live-status-badge-besar" style="display:none;"></span>
     </div>
 
