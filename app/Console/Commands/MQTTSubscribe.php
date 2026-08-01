@@ -25,137 +25,165 @@ class MQTTSubscribe extends Command
     {
         $server   = env('MQTT_HOST');
         $port     = (int) env('MQTT_PORT', 8883);
-        $clientId = env('MQTT_CLIENT_ID', 'laravel-server-') . uniqid();
         $username = env('MQTT_USERNAME');
         $password = env('MQTT_PASSWORD');
         $useTls   = filter_var(env('MQTT_USE_TLS', true), FILTER_VALIDATE_BOOLEAN);
 
-        $connectionSettings = (new ConnectionSettings)
-            ->setKeepAliveInterval(10)
-            ->setConnectTimeout(5)
-            ->setUsername($username)
-            ->setPassword($password)
-            ->setUseTls($useTls)
-            ->setTlsVerifyPeer(true)
-            ->setTlsSelfSignedAllowed(false);
+        $this->info('MQTT Subscriber Service berjalan...');
 
-        $mqtt = new MqttClient($server, $port, $clientId);
-        $mqtt->connect($connectionSettings, true);
+        while (true) {
+            $clientId = env('MQTT_CLIENT_ID', 'laravel-server-') . '-' . uniqid();
 
-        $this->info('MQTT Subscriber berjalan...');
+                try {
+                    $connectionSettings = (new ConnectionSettings)
+                        ->setKeepAliveInterval(10)
+                        ->setConnectTimeout(10)
+                        ->setUsername($username)
+                        ->setPassword($password)
+                        ->setUseTls($useTls)
+                        ->setTlsVerifyPeer(true)
+                        ->setTlsSelfSignedAllowed(false);
 
-        $mqtt->subscribe('priyatna/deteksi/data', function ($topic, $message) {
+                    $mqtt = new MqttClient($server, $port, $clientId);
+                    $this->info("Menghubungkan ke Broker MQTT ({$server}:{$port})...");
+                    $mqtt->connect($connectionSettings, true);
 
-            $this->info("Pesan masuk: " . $message);
-            $data = json_decode($message, true);
+                    $this->info("✅ MQTT Subscriber terhubung & mendengarkan topic 'priyatna/deteksi/data'...");
 
-            if (!$data) {
-                $this->error('JSON tidak valid');
-                return;
-            }
+                    $mqtt->subscribe('priyatna/deteksi/data', function ($topic, $message) {
+                        try {
+                            $this->info("Pesan masuk pada topic [{$topic}]: " . $message);
+                            $data = json_decode($message, true);
 
-            $suhu  = $data['suhu_udara']       ?? 0;
-            $udara = $data['kelembapan_udara']  ?? 0;
-            $tanah = $data['kelembapan_tanah']  ?? 0;
+                            if (!$data || !is_array($data)) {
+                                $this->error('⚠️ JSON tidak valid atau bukan array');
+                                return;
+                            }
 
-            // ✅ PERBAIKAN: Hitung fuzzy di server
-            $nilai_fuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);
-            [$deteksi]   = $this->getStatus($nilai_fuzzy);
+                            // Dukung alias field
+                            $suhu  = (float) ($data['suhu_udara']       ?? ($data['suhu']       ?? ($data['temperature'] ?? 0)));
+                            $udara = (float) ($data['kelembapan_udara']  ?? ($data['kelembapan']  ?? ($data['humidity']    ?? 0)));
+                            $tanah = (float) ($data['kelembapan_tanah']  ?? ($data['tanah']       ?? ($data['soil']        ?? 0)));
 
-            // ── BACA CACHE YOLO (Integrasi Decision Rule) ──
-            $inputDeteksiYolo = null;
-            $inputConfidenceYolo = null;
-            $hasilDeteksiYolo = 'OFF';
-            
-            if (Cache::has('yolo_live_data')) {
-                $yolo = Cache::get('yolo_live_data');
-                $inputDeteksiYolo = $yolo['deteksi_yolo'] ?? null;
-                $inputConfidenceYolo = $yolo['confidence_yolo'] ?? null;
-                $hasilDeteksiYolo = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
-            }
+                            // ✅ Hitung fuzzy di server
+                            $nilai_fuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);
+                            [$deteksi]   = $this->getStatus($nilai_fuzzy);
 
-            // Keputusan Sistem
-            $controller = app(\App\Http\Controllers\SensorController::class);
-            $keputusanSistem = $controller->getSystemDecision($hasilDeteksiYolo, $deteksi);
+                            // ── BACA CACHE YOLO (Integrasi Decision Rule) ──
+                            $inputDeteksiYolo = null;
+                            $inputConfidenceYolo = null;
+                            $hasilDeteksiYolo = 'OFF';
 
-            $this->info(sprintf(
-                'Fuzzy server-side → suhu:%.1f udara:%.1f tanah:%.1f → nilai:%.4f status:%s',
-                $suhu, $udara, $tanah, $nilai_fuzzy, $keputusanSistem
-            ));
+                            if (Cache::has('yolo_live_data')) {
+                            $yolo = Cache::get('yolo_live_data');
+                            $inputDeteksiYolo = $yolo['deteksi_yolo'] ?? null;
+                            $inputConfidenceYolo = $yolo['confidence_yolo'] ?? null;
+                            $hasilDeteksiYolo = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
+                        }
 
-            // Susun data untuk Cache live monitoring
-            $cacheData = [
-                'suhu'             => $suhu,
-                'kelembapan_udara' => $udara,
-                'kelembapan_tanah' => $tanah,
-                'nilai_fuzzy'      => round($nilai_fuzzy, 4),
-                'deteksi'          => $keputusanSistem,
-                'deteksi_yolo'     => $inputDeteksiYolo,
-                'confidence_yolo'  => $inputConfidenceYolo,
-                'prediksi_sensor'  => $deteksi,
-                'hasil_deteksi_yolo' => $hasilDeteksiYolo,
-                'keputusan_sistem' => $keputusanSistem,
-                'image'            => null,
-                'updated_at'       => now()->toIso8601String(),
-            ];
+                        // Keputusan Sistem
+                        $controller = app(\App\Http\Controllers\SensorController::class);
+                        $keputusanSistem = $controller->getSystemDecision($hasilDeteksiYolo, $deteksi);
 
-            // Simpan ke Cache setiap data MQTT masuk (validasi alat online per 7 menit)
-            Cache::put('iot_live_data', $cacheData, now()->addMinutes(7));
-            $this->info('Cache real-time berhasil diperbarui.');
+                        $this->info(sprintf(
+                            'Fuzzy server-side → suhu:%.1f udara:%.1f tanah:%.1f → nilai:%.4f status:%s',
+                            $suhu, $udara, $tanah, $nilai_fuzzy, $keputusanSistem
+                        ));
 
-            // Cek histori terakhir untuk interval 15 menit
-            $latestHistori = SensorReading::latest()->first();
-            $shouldSave = true;
+                        // Susun data untuk Cache live monitoring
+                        $cacheData = [
+                            'suhu'             => $suhu,
+                            'kelembapan_udara' => $udara,
+                            'kelembapan_tanah' => $tanah,
+                            'nilai_fuzzy'      => round($nilai_fuzzy, 4),
+                            'deteksi'          => $keputusanSistem,
+                            'deteksi_yolo'     => $inputDeteksiYolo,
+                            'confidence_yolo'  => $inputConfidenceYolo,
+                            'prediksi_sensor'  => $deteksi,
+                            'hasil_deteksi_yolo' => $hasilDeteksiYolo,
+                            'keputusan_sistem' => $keputusanSistem,
+                            'image'            => null,
+                            'updated_at'       => now()->toIso8601String(),
+                        ];
 
-            if ($latestHistori) {
-                $selisihMenit = $latestHistori->created_at->diffInMinutes(now());
-                if ($selisihMenit < 15) {
-                    $shouldSave = false;
-                }
-            }
+                        // Simpan ke Cache setiap data MQTT masuk (validasi alat online per 7 menit)
+                        Cache::put('iot_live_data', $cacheData, now()->addMinutes(7));
+                        $this->info('Cache real-time berhasil diperbarui.');
 
-            // Simpan ke Database hanya jika selisih waktu >= 15 menit
-            if ($shouldSave) {
-                // Salin gambar live terbaru menjadi file permanen jika tersedia
-                $permanentPath = null;
-                if (\Illuminate\Support\Facades\Storage::disk('public')->exists('kamera/latest_live.jpg')) {
-                    $permanentFilename = 'kamera/periodic_' . time() . '_' . uniqid() . '.jpg';
-                    \Illuminate\Support\Facades\Storage::disk('public')->copy('kamera/latest_live.jpg', $permanentFilename);
-                    $permanentPath = $permanentFilename;
-                }
+                        // Atomic Lock & 15-Minute Interval Check for DB Persistence (Shared Key with HTTP API)
+                        $lockAcquired = Cache::lock('sensor_periodic_db_save_lock', 10)->get(function () use ($suhu, $udara, $tanah, $nilai_fuzzy, $inputDeteksiYolo, $inputConfidenceYolo, $keputusanSistem) {
+                            // Source of truth: hanya ambil record sensor periodik (bukan insiden YOLO ON)
+                            $latestHistori = SensorReading::where(function ($q) {
+                                $q->whereNull('deteksi_yolo')->orWhere('deteksi_yolo', 'OFF');
+                            })->latest()->first();
 
-                $sensor = SensorReading::create([
-                    'suhu'             => $suhu,
-                    'kelembapan_udara' => $udara,
-                    'kelembapan_tanah' => $tanah,
-                    'nilai_fuzzy'      => $nilai_fuzzy,
-                    'image'            => $permanentPath,
-                    'deteksi'          => $keputusanSistem,
-                    'deteksi_yolo'     => $inputDeteksiYolo,
-                    'confidence_yolo'  => $inputConfidenceYolo,
-                ]);
+                            $shouldSave = true;
+                            $selisihMenit = 999;
 
-                $this->info('Data BERHASIL disimpan ke Database (Interval 15 Menit)!');
+                            if ($latestHistori) {
+                                $selisihMenit = $latestHistori->created_at->diffInMinutes(now());
+                                if ($selisihMenit < 15) {
+                                    $shouldSave = false;
+                                }
+                            }
 
-                // NOTIFIKASI
-                if (in_array($keputusanSistem, ['HAMA', 'TINGGI', 'SEDANG'])) {
-                    $lastNotif = Notification::where('status', $keputusanSistem)
-                                             ->where('created_at', '>=', now()->subMinutes(15))
-                                             ->first();
+                            if ($shouldSave) {
+                                $permanentPath = null;
+                                if (\Illuminate\Support\Facades\Storage::disk('public')->exists('kamera/latest_live.jpg')) {
+                                    $permanentFilename = 'kamera/periodic_' . time() . '_' . uniqid() . '.jpg';
+                                    \Illuminate\Support\Facades\Storage::disk('public')->copy('kamera/latest_live.jpg', $permanentFilename);
+                                    $permanentPath = $permanentFilename;
+                                }
 
-                    if (!$lastNotif) {
-                        $controller = app(SensorController::class);
-                        $controller->createNotification($keputusanSistem, round($nilai_fuzzy, 4), $sensor);
-                        $this->info("Notifikasi {$keputusanSistem} dikirim!");
+                                $sensor = SensorReading::create([
+                                    'suhu'             => $suhu,
+                                    'kelembapan_udara' => $udara,
+                                    'kelembapan_tanah' => $tanah,
+                                    'nilai_fuzzy'      => $nilai_fuzzy,
+                                    'image'            => $permanentPath,
+                                    'deteksi'          => $keputusanSistem,
+                                    'deteksi_yolo'     => $inputDeteksiYolo,
+                                    'confidence_yolo'  => $inputConfidenceYolo,
+                                ]);
+
+                                $this->info("Data BERHASIL disimpan ke Database (Interval 15 Menit)! ID: {$sensor->id}");
+
+                                if (in_array($keputusanSistem, ['HAMA', 'TINGGI', 'SEDANG'])) {
+                                    $lastNotif = Notification::where('status', $keputusanSistem)
+                                                             ->where('created_at', '>=', now()->subMinutes(15))
+                                                             ->first();
+
+                                    if (!$lastNotif) {
+                                        $controller = app(SensorController::class);
+                                        $controller->createNotification($keputusanSistem, round($nilai_fuzzy, 4), $sensor);
+                                        $this->info("Notifikasi {$keputusanSistem} dikirim!");
+                                    }
+                                }
+                            } else {
+                                $this->info("Penyimpanan DB dilewati (Selisih waktu: {$selisihMenit} menit < 15 menit).");
+                            }
+                        });
+
+                        if (!$lockAcquired) {
+                            $this->info('Penyimpanan DB dilewati (Lock sedang dipegang oleh proses subscriber lain).');
+                        }
+
+                    } catch (\Throwable $e) {
+                        $this->error("⚠️ Error memproses payload MQTT: " . $e->getMessage());
+                        Log::error("MQTT Payload Error: " . $e->getMessage());
                     }
-                }
-            } else {
-                $this->info('Penyimpanan DB dilewati (Belum mencapai 15 menit dari histori terakhir).');
+
+                }, 0);
+
+                $mqtt->loop(true);
+
+            } catch (\Throwable $e) {
+                $this->error("⚠️ MQTT Disconnected / Socket Exception: " . $e->getMessage());
+                Log::warning("MQTT Subscriber Connection Lost: " . $e->getMessage());
+                $this->info("Mencoba me-reconnect dalam 3 detik...");
+                sleep(3);
             }
-
-        }, 0);
-
-        $mqtt->loop(true);
+        }
     }
 
     // ==================================================================================
