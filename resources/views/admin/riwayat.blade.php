@@ -36,7 +36,6 @@
 <div class="page-header">
     <div>
         <h1>📋 Riwayat Data Sensor</h1>
-        <p>Kelola seluruh data sensor yang tersimpan di database</p>
     </div>
     <span style="display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:white;
         padding:6px 14px;border-radius:99px;font-size:12px;font-weight:700;">
@@ -235,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (btnDeleteAll) {
         const deleteAllUrl = @json(route('admin.riwayat.delete-all'));
-        
+
 
         btnDeleteAll.addEventListener('click', function(e) {
             e.preventDefault();
@@ -262,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response.json();
             })
             .then(data => {
-                
+
                 if (data.success) {
                     alert('✅ ' + data.message);
                     location.reload();

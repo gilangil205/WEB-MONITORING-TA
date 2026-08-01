@@ -145,11 +145,9 @@
 <div class="page-header">
     <div>
         @if($activeSection === 'users')
-            <h1>⚙️ Pengguna Sistem</h1>
-            <p>Kelola daftar pengguna dan peranan akun SmartFarm</p>
+            <h1>Kelola Daftar Pengguna</h1>
         @else
-            <h1>⚙️ Konfigurasi Threshold</h1>
-            <p>Kelola ambang batas kondisi ideal sensor dan keputusan Fuzzy Sugeno</p>
+            <h1>Konfigurasi Threshold</h1>
         @endif
     </div>
     <span style="display:inline-flex;align-items:center;gap:6px;background:#7c3aed;color:white;
