@@ -105,31 +105,33 @@ class SensorController extends Controller
     // ================== HELPER: BUAT NOTIFIKASI ==================
     public function createNotification(string $status, float $nilai, ?SensorReading $sensor = null)
     {
-        $users = User::whereIn('role', ['user', 'admin'])->get();
-
+        // Hanya status HAMA dan TINGGI yang membuat notifikasi (SEDANG dan RENDAH diabaikan)
         if ($status === 'HAMA') {
             $title = 'Hama Tikus Terdeteksi';
             $message = 'Tikus terdeteksi pada citra kamera. Lakukan pemeriksaan dan penanganan pada area lahan terkait.';
         } elseif ($status === 'TINGGI') {
             $title = 'Risiko Lingkungan Tinggi';
             $message = 'Kondisi suhu dan kelembapan menunjukkan tingkat risiko lingkungan tinggi. Disarankan melakukan pemeriksaan langsung pada lahan.';
-        } elseif ($status === 'SEDANG') {
-            $title = 'Risiko Lingkungan Sedang';
-            $message = 'Kondisi lingkungan berada pada tingkat risiko sedang. Lakukan pemantauan secara berkala.';
         } else {
             return;
         }
 
-        foreach ($users as $user) {
-            Notification::create([
-                'user_id' => $user->id,
-                'title' => $title,
-                'message' => $message,
-                'status' => $status,
-                'fuzzy_value' => $nilai,
-                'sensor_reading_id' => $sensor?->id,
-                'is_read' => false,
-            ]);
+        try {
+            $users = User::whereIn('role', ['user', 'admin'])->get();
+
+            foreach ($users as $user) {
+                Notification::create([
+                    'user_id'           => $user->id,
+                    'title'             => $title,
+                    'message'           => $message,
+                    'status'            => $status,
+                    'fuzzy_value'       => $nilai,
+                    'sensor_reading_id' => $sensor?->id,
+                    'is_read'           => false,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error("[NOTIFICATION_CREATE_ERROR] Status: {$status} | SensorID: " . ($sensor?->id ?? 'NULL') . " | Error: " . $e->getMessage());
         }
     }
 
@@ -594,10 +596,7 @@ class SensorController extends Controller
             'deteksi'          => $keputusanSistem,
         ]);
 
-        if (in_array($keputusanSistem, ['HAMA', 'TINGGI', 'SEDANG'])) {
-            $this->createNotification($keputusanSistem, $nilaiFuzzy, $sensor);
-        }
-
+        // Simulasi manual admin memperbarui database tanpa memicu notifikasi berulang
         return redirect()->route('dashboard')
             ->with('success', '✅ Data real-time berhasil disimpan ke database!');
     }
