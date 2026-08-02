@@ -19,6 +19,12 @@ class SensorController extends Controller
     private const T_SUHU   = 3;
     private const T_LEMBAP = 5;
 
+    /**
+     * Batas waktu kedaluwarsa gambar live kamera (dalam menit).
+     * Jika timestamp penerimaan gambar melewati batas ini, status kamera dianggap kedaluwarsa/tidak aktif.
+     */
+    public const CAMERA_EXPIRATION_MINUTES = 2;
+
 
 
     // ================== HELPER: RESOLVE NILAI FUZZY ==================
@@ -236,6 +242,19 @@ class SensorController extends Controller
         $fotoData    = SensorReading::whereNotNull('image')->latest()->take(5)->get();
         $riwayatHtml = $this->buildRiwayatHtml($fotoData);
 
+        // ── CEK KEDALUWARSA GAMBAR LIVE KAMERA ──
+        $cameraLastUpdatedAt = Cache::get('camera_last_updated_at');
+        $isCameraFresh = false;
+        $liveImageUrl = null;
+
+        if ($cameraLastUpdatedAt && Storage::disk('public')->exists('kamera/latest_live.jpg')) {
+            $diffMinutes = Carbon::parse($cameraLastUpdatedAt)->diffInMinutes(now());
+            if ($diffMinutes <= self::CAMERA_EXPIRATION_MINUTES) {
+                $isCameraFresh = true;
+                $liveImageUrl = asset('storage/kamera/latest_live.jpg');
+            }
+        }
+
         return response()->json([
             'success'             => true,
             'isOnline'            => true,
@@ -244,7 +263,8 @@ class SensorController extends Controller
             'kelembapan_tanah'    => $d['kelembapan_tanah'],
             'nilai'               => round($d['nilai_fuzzy'], 4),
             'status'              => $d['deteksi'],
-            'image'               => $fotoData->first() ? asset('storage/' . $fotoData->first()->image) : null,
+            'image'               => $isCameraFresh ? $liveImageUrl : null,
+            'camera_fresh'        => $isCameraFresh,
             'deteksi_yolo'        => $d['deteksi_yolo'] ?? null,
             'confidence_yolo'     => $d['confidence_yolo'] ?? null,
             'prediksi_sensor'     => $d['prediksi_sensor'] ?? ($d['deteksi'] ?? 'AMAN'),
@@ -381,8 +401,9 @@ class SensorController extends Controller
 
         $path = null;
         if ($request->hasFile('image')) {
-            // Simpan gambar live terbaru dengan path stabil
+            // Simpan gambar live terbaru dengan path stabil & simpan timestamp penerimaan di Cache
             $path = $request->file('image')->storeAs('kamera', 'latest_live.jpg', 'public');
+            Cache::put('camera_last_updated_at', now()->toIso8601String(), now()->addDays(7));
         }
 
         $nilaiFuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);

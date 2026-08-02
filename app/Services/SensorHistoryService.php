@@ -119,20 +119,13 @@ class SensorHistoryService
 
             if ($shouldSave) {
                 try {
-                    // Tentukan file gambar permanen jika ada
-                    $permanentPath = $imagePath;
-                    if (!$permanentPath && Storage::disk('public')->exists('kamera/latest_live.jpg')) {
-                        $permanentFilename = 'kamera/periodic_' . time() . '_' . uniqid() . '.jpg';
-                        Storage::disk('public')->copy('kamera/latest_live.jpg', $permanentFilename);
-                        $permanentPath = $permanentFilename;
-                    }
-
+                    // Record sensor periodik 15-menit dari MQTT/HTTP wajib bernilai image = null
                     $sensor = SensorReading::create([
                         'suhu'             => $suhu,
                         'kelembapan_udara' => $udara,
                         'kelembapan_tanah' => $tanah,
                         'nilai_fuzzy'      => $nilaiFuzzy,
-                        'image'            => $permanentPath,
+                        'image'            => null,
                         'deteksi'          => $keputusanSistem,
                         'deteksi_yolo'     => $inputDeteksiYolo,
                         'confidence_yolo'  => $inputConfidenceYolo,
