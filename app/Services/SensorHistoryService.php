@@ -147,25 +147,7 @@ class SensorHistoryService
                         $source, $sensor->id, $result['save_decision'], $result['current_15_minute_slot']
                     ));
 
-                    // Notifikasi hanya untuk status TINGGI (saat transisi !TINGGI -> TINGGI)
-                    if ($keputusanSistem === 'TINGGI') {
-                        $prevStatusWasTinggi = $latestPeriodic && ($latestPeriodic->deteksi === 'TINGGI');
-
-                        if (!$prevStatusWasTinggi) {
-                            $lockNotif = Cache::lock('notification_fuzzy_high_transition_lock', 5);
-                            if ($lockNotif->get()) {
-                                try {
-                                    $controller = app(SensorController::class);
-                                    $controller->createNotification('TINGGI', round($nilaiFuzzy, 4), $sensor);
-                                    Log::info("[NOTIFICATION_TRIGGERED] Status TINGGI (Transisi dari " . ($latestPeriodic->deteksi ?? 'AWAL') . ")");
-                                } finally {
-                                    $lockNotif->release();
-                                }
-                            }
-                        } else {
-                            Log::info("[NOTIFICATION_SKIPPED] Status tetap TINGGI (TINGGI -> TINGGI)");
-                        }
-                    }
+                    // Fitur Notifikasi tidak lagi digunakan dalam alur produksi
                 } catch (\Throwable $e) {
                     $result['status']       = 'insert_error';
                     $result['insert_error'] = $e->getMessage();

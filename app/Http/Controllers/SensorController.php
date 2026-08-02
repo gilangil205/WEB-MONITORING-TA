@@ -102,37 +102,11 @@ class SensorController extends Controller
         ];
     }
 
-    // ================== HELPER: BUAT NOTIFIKASI ==================
+    // ================== HELPER: BUAT NOTIFIKASI (STUB - DEPRECATED) ==================
     public function createNotification(string $status, float $nilai, ?SensorReading $sensor = null)
     {
-        // Hanya status HAMA dan TINGGI yang membuat notifikasi (SEDANG dan RENDAH diabaikan)
-        if ($status === 'HAMA') {
-            $title = 'Hama Tikus Terdeteksi';
-            $message = 'Tikus terdeteksi pada citra kamera. Lakukan pemeriksaan dan penanganan pada area lahan terkait.';
-        } elseif ($status === 'TINGGI') {
-            $title = 'Risiko Lingkungan Tinggi';
-            $message = 'Kondisi suhu dan kelembapan menunjukkan tingkat risiko lingkungan tinggi. Disarankan melakukan pemeriksaan langsung pada lahan.';
-        } else {
-            return;
-        }
-
-        try {
-            $users = User::whereIn('role', ['user', 'admin'])->get();
-
-            foreach ($users as $user) {
-                Notification::create([
-                    'user_id'           => $user->id,
-                    'title'             => $title,
-                    'message'           => $message,
-                    'status'            => $status,
-                    'fuzzy_value'       => $nilai,
-                    'sensor_reading_id' => $sensor?->id,
-                    'is_read'           => false,
-                ]);
-            }
-        } catch (\Throwable $e) {
-            Log::error("[NOTIFICATION_CREATE_ERROR] Status: {$status} | SensorID: " . ($sensor?->id ?? 'NULL') . " | Error: " . $e->getMessage());
-        }
+        // Fitur notifikasi tidak lagi digunakan dalam alur produksi
+        return;
     }
 
     // ================== ENDPOINT: /live-data ==================
@@ -362,7 +336,9 @@ class SensorController extends Controller
         }
 
         // 1. MAPPING PAYLOAD PYTHON (YOLO)
-        $isYoloOnly = $request->input('sensor_name') === 'yolo_mouse_detector';
+        $isYoloOnly = ($request->input('sensor_name') === 'yolo_mouse_detector') 
+                    || $request->has('deteksi_yolo') 
+                    || ($request->has('status') && in_array(strtoupper((string)$request->input('status')), ['ON', 'OFF']));
 
         // 2. VALIDASI DINAMIS (Tidak Mewajibkan Sensor untuk YOLO)
         $request->validate([
@@ -491,7 +467,6 @@ class SensorController extends Controller
                                 'confidence_yolo'  => $inputConfidenceYolo,
                             ]);
 
-                            $this->createNotification($keputusanSistem, $nilaiFuzzy, $sensor);
                             Cache::forever('latest_yolo_status', 'ON');
                             $isStored = true;
                         }
