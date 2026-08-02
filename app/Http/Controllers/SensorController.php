@@ -403,7 +403,15 @@ class SensorController extends Controller
         if ($request->hasFile('image')) {
             // Simpan gambar live terbaru dengan path stabil & simpan timestamp penerimaan di Cache
             $path = $request->file('image')->storeAs('kamera', 'latest_live.jpg', 'public');
-            Cache::put('camera_last_updated_at', now()->toIso8601String(), now()->addDays(7));
+            $nowIso = now()->toIso8601String();
+            Cache::put('camera_last_updated_at', $nowIso, now()->addDays(7));
+
+            // ── FRAME TOKEN & YOLO TIMESTAMP ──
+            // Simpan timestamp penerimaan YOLO dan frame token unik untuk setiap gambar baru.
+            // Frame token mencegah penggunaan ulang gambar lama sebagai snapshot periodik.
+            Cache::put('latest_yolo_updated_at', $nowIso, now()->addDays(7));
+            $frameToken = md5(microtime(true) . $request->file('image')->getSize() . uniqid('', true));
+            Cache::put('latest_yolo_frame_token', $frameToken, now()->addDays(7));
         }
 
         $nilaiFuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);

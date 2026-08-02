@@ -54,8 +54,16 @@ class SensorHistoryService
 
         // 1. Dapatkan Atomic Lock terpusat
         $lockAcquired = Cache::lock('sensor_periodic_db_save_lock', 10)->get(function () use (
-            $suhu, $udara, $tanah, $nilaiFuzzy, $keputusanSistem,
-            $inputDeteksiYolo, $inputConfidenceYolo, $imagePath, $source, &$result
+            $suhu,
+            $udara,
+            $tanah,
+            $nilaiFuzzy,
+            $keputusanSistem,
+            $inputDeteksiYolo,
+            $inputConfidenceYolo,
+            $imagePath,
+            $source,
+            &$result
         ) {
             $result['lock_acquired'] = true;
             $now = Carbon::now();
@@ -119,15 +127,74 @@ class SensorHistoryService
 
             if ($shouldSave) {
                 try {
-                    // Record sensor periodik 15-menit dari MQTT/HTTP wajib bernilai image = null
+                    // ── LOGIKA PENENTUAN GAMBAR SNAPSHOT PERIODIK (15m) ──
+                    // Snapshot OFF hanya boleh dibuat jika SELURUH kondisi benar:
+                    // (a) camera_last_updated_at tersedia dan belum kedaluwarsa (≤2m)
+                    // (b) latest_yolo_updated_at tersedia dan belum kedaluwarsa (≤2m)
+                    // (c) latest_yolo_status secara eksplisit bernilai 'OFF' (tanpa default)
+                    // (d) latest_live.jpg tersedia di disk
+                    // (e) frame token terbaru belum pernah digunakan sebagai snapshot periodik
+
+                    $cameraLastUpdatedAt   = Cache::get('camera_last_updated_at');
+                    $latestYoloStatus      = Cache::get('latest_yolo_status');        // NULL jika tidak ada
+                    $latestYoloUpdatedAt   = Cache::get('latest_yolo_updated_at');    // NULL jika tidak ada
+                    $latestYoloFrameToken  = Cache::get('latest_yolo_frame_token');   // NULL jika tidak ada
+                    $lastUsedFrameToken    = Cache::get('last_periodic_snapshot_frame_token');
+                    $liveFileExists        = Storage::disk('public')->exists('kamera/latest_live.jpg');
+
+                    // (a) Cek kesegaran timestamp kamera (≤ CAMERA_EXPIRATION_MINUTES)
+                    $isCameraFresh = false;
+                    if ($cameraLastUpdatedAt && $liveFileExists) {
+                        $cameraDiffMinutes = Carbon::parse($cameraLastUpdatedAt)->diffInMinutes($now);
+                        if ($cameraDiffMinutes <= SensorController::CAMERA_EXPIRATION_MINUTES) {
+                            $isCameraFresh = true;
+                        }
+                    }
+
+                    // (b) Cek kesegaran timestamp YOLO (≤ CAMERA_EXPIRATION_MINUTES)
+                    $isYoloFresh = false;
+                    if ($latestYoloUpdatedAt) {
+                        $yoloDiffMinutes = Carbon::parse($latestYoloUpdatedAt)->diffInMinutes($now);
+                        if ($yoloDiffMinutes <= SensorController::CAMERA_EXPIRATION_MINUTES) {
+                            $isYoloFresh = true;
+                        }
+                    }
+
+                    // (c) Status YOLO harus secara eksplisit 'OFF'
+                    $isYoloExplicitlyOff = ($latestYoloStatus !== null && strtoupper(trim((string)$latestYoloStatus)) === 'OFF');
+
+                    // (e) Frame token harus berbeda dari snapshot periodik sebelumnya
+                    $isNewFrame = ($latestYoloFrameToken !== null && $latestYoloFrameToken !== $lastUsedFrameToken);
+
+                    // Tentukan snapshot path
+                    $permanentPath  = null;
+                    $snapshotYolo   = null;
+
+                    if ($isCameraFresh && $isYoloFresh && $isYoloExplicitlyOff && $liveFileExists && $isNewFrame) {
+                        $snapshotFilename = 'kamera/snapshot_15m_' . time() . '_' . uniqid() . '.jpg';
+                        Storage::disk('public')->copy('kamera/latest_live.jpg', $snapshotFilename);
+                        $permanentPath = $snapshotFilename;
+                        $snapshotYolo  = 'OFF';
+
+                        // Simpan frame token yang sudah digunakan
+                        Cache::forever('last_periodic_snapshot_frame_token', $latestYoloFrameToken);
+                    }
+
+                    // Konsistensi data: image & deteksi_yolo harus sinkron
+                    // - image terisi → deteksi_yolo wajib terisi ('OFF')
+                    // - image NULL   → deteksi_yolo mengikuti input asli atau NULL
+                    $finalDeteksiYolo = $permanentPath !== null
+                        ? $snapshotYolo
+                        : $inputDeteksiYolo;
+
                     $sensor = SensorReading::create([
                         'suhu'             => $suhu,
                         'kelembapan_udara' => $udara,
                         'kelembapan_tanah' => $tanah,
                         'nilai_fuzzy'      => $nilaiFuzzy,
-                        'image'            => null,
+                        'image'            => $permanentPath,
                         'deteksi'          => $keputusanSistem,
-                        'deteksi_yolo'     => $inputDeteksiYolo,
+                        'deteksi_yolo'     => $finalDeteksiYolo,
                         'confidence_yolo'  => $inputConfidenceYolo,
                     ]);
 
@@ -137,7 +204,10 @@ class SensorHistoryService
                     // Logging Diagnostik
                     Log::info(sprintf(
                         "[PERIODIC_SAVE] SOURCE=%s | ID=%d | Decision=%s | Slot=%s",
-                        $source, $sensor->id, $result['save_decision'], $result['current_15_minute_slot']
+                        $source,
+                        $sensor->id,
+                        $result['save_decision'],
+                        $result['current_15_minute_slot']
                     ));
 
                     // Fitur Notifikasi tidak lagi digunakan dalam alur produksi
@@ -150,7 +220,10 @@ class SensorHistoryService
                 $result['status'] = 'skipped_interval';
                 Log::info(sprintf(
                     "[PERIODIC_SKIP] SOURCE=%s | Decision=%s | DiffMinutes=%s | SlotExists=%s",
-                    $source, $result['save_decision'], (string)$result['difference_minutes'], $alreadySavedInSlot ? 'YES' : 'NO'
+                    $source,
+                    $result['save_decision'],
+                    (string)$result['difference_minutes'],
+                    $alreadySavedInSlot ? 'YES' : 'NO'
                 ));
             }
         });
