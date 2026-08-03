@@ -277,7 +277,11 @@
                                 <td style="text-align:center;">
                                     @if($u->id !== auth()->id())
                                         <form action="{{ route('admin.users.delete', $u) }}" method="POST"
-                                              onsubmit="return confirm('Hapus pengguna {{ $u->name }}?')">
+                                              class="js-confirm-form"
+                                              data-confirm-title="Hapus Pengguna?"
+                                              data-confirm-message="Akun Petani {{ $u->name }} akan dihapus dan tidak dapat digunakan kembali."
+                                              data-confirm-button="Ya, Hapus"
+                                              data-confirm-type="danger">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="btn-del">
                                                 <i data-feather="trash-2" style="width:11px;height:11px;"></i> Hapus
@@ -332,7 +336,12 @@
         };
     @endphp
 
-    <form action="{{ route('admin.threshold.update') }}" method="POST" id="formThreshold" novalidate>
+    <form action="{{ route('admin.threshold.update') }}" method="POST" id="formThreshold" novalidate
+          class="js-confirm-form"
+          data-confirm-title="Simpan Perubahan Threshold?"
+          data-confirm-message="Nilai threshold yang baru akan digunakan dalam proses klasifikasi risiko lingkungan."
+          data-confirm-button="Ya, Simpan"
+          data-confirm-type="success">
         @csrf
 
         {{-- SUHU UDARA --}}
@@ -525,8 +534,7 @@
         </div>
 
         <div class="btn-row">
-            <button type="button" class="btn-reset"
-                onclick="if(confirm('Reset semua ke nilai default penelitian?')) document.getElementById('formReset').submit()">
+            <button type="button" class="btn-reset" onclick="triggerResetConfirm()">
                 <i data-feather="rotate-ccw" style="width:13px;height:13px;"></i> Reset default
             </button>
             <button type="submit" class="btn-save">
@@ -535,11 +543,29 @@
         </div>
     </form>
 
-    <form action="{{ route('admin.threshold.reset') }}" method="POST" id="formReset" style="display:none;">
+    <form action="{{ route('admin.threshold.reset') }}" method="POST" id="formReset" style="display:none;"
+          class="js-confirm-form"
+          data-confirm-title="Reset Threshold?"
+          data-confirm-message="Seluruh nilai threshold akan dikembalikan ke konfigurasi default penelitian."
+          data-confirm-button="Ya, Reset"
+          data-confirm-type="warning">
         @csrf
     </form>
 
     <script>
+    function triggerResetConfirm() {
+        var form = document.getElementById('formReset');
+        if (form) {
+            openConfirmModal({
+                title: 'Reset Threshold?',
+                message: 'Seluruh nilai threshold akan dikembalikan ke konfigurasi default penelitian.',
+                buttonText: 'Ya, Reset',
+                type: 'warning',
+                form: form
+            });
+        }
+    }
+
     function updateBar(name) {
         var isS = name === 'suhu';
         var scaleMin = isS ? parseFloat(document.getElementById(name + '_aman').min) : 0;
@@ -582,12 +608,24 @@
             var vH = parseFloat(document.getElementById(n + '_hama').value);
             if (vA >= vW) {
                 e.preventDefault();
-                alert('⚠️ ' + labels[n] + ': nilai batas pertama (' + vA + ') harus lebih kecil dari nilai batas kedua (' + vW + ').');
+                e.stopImmediatePropagation();
+                openConfirmModal({
+                    title: 'Konfigurasi Gagal Disimpan',
+                    message: labels[n] + ': nilai batas pertama harus lebih kecil dari nilai batas kedua.',
+                    buttonText: 'Tutup',
+                    type: 'danger'
+                });
                 return false;
             }
             if (vW >= vH) {
                 e.preventDefault();
-                alert('⚠️ ' + labels[n] + ': nilai batas kedua (' + vW + ') harus lebih kecil dari nilai batas ketiga (' + vH + ').');
+                e.stopImmediatePropagation();
+                openConfirmModal({
+                    title: 'Konfigurasi Gagal Disimpan',
+                    message: labels[n] + ': nilai batas kedua harus lebih kecil dari nilai batas ketiga.',
+                    buttonText: 'Tutup',
+                    type: 'danger'
+                });
                 return false;
             }
         }
@@ -595,7 +633,13 @@
         var tw = parseFloat(document.getElementById('threshold_waspada').value);
         if (tw >= th) {
             e.preventDefault();
-            alert('⚠️ Threshold WASPADA (' + tw + ') harus lebih kecil dari threshold HAMA (' + th + ').');
+            e.stopImmediatePropagation();
+            openConfirmModal({
+                title: 'Konfigurasi Gagal Disimpan',
+                message: 'Threshold WASPADA harus lebih kecil dari threshold HAMA.',
+                buttonText: 'Tutup',
+                type: 'danger'
+            });
             return false;
         }
     });

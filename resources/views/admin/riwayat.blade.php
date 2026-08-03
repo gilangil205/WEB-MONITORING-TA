@@ -190,7 +190,11 @@
 
                 <td style="text-align:center;">
                     <form action="{{ route('admin.riwayat.delete', $item->id) }}" method="POST"
-                          onsubmit="return confirm('Yakin ingin menghapus data ini?');"
+                          class="js-confirm-form"
+                          data-confirm-title="Hapus Data Riwayat?"
+                          data-confirm-message="Data riwayat yang dipilih akan dihapus secara permanen dan tidak dapat dikembalikan."
+                          data-confirm-button="Ya, Hapus"
+                          data-confirm-type="danger"
                           style="display:inline;">
                         @csrf
                         @method('DELETE')
@@ -235,47 +239,58 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btnDeleteAll) {
         const deleteAllUrl = @json(route('admin.riwayat.delete-all'));
 
-
         btnDeleteAll.addEventListener('click', function(e) {
             e.preventDefault();
 
-            if (!confirm('⚠️ Yakin ingin menghapus SEMUA data? Tindakan ini tidak dapat dibatalkan!')) {
-                return;
-            }
+            openConfirmModal({
+                title: 'Hapus Seluruh Riwayat?',
+                message: 'Seluruh data riwayat akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan.',
+                buttonText: 'Ya, Hapus Semua',
+                type: 'danger',
+                callback: function() {
+                    btnDeleteAll.disabled = true;
+                    btnDeleteAll.textContent = '⏳ Menghapus...';
 
-            btnDeleteAll.disabled = true;
-            btnDeleteAll.textContent = '⏳ Menghapus...';
-
-            fetch(deleteAllUrl, {
-                method: 'DELETE',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    fetch(deleteAllUrl, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(err => { throw new Error(err.message || 'Server error'); });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            location.reload();
+                        } else {
+                            openConfirmModal({
+                                title: 'Riwayat Gagal Dihapus',
+                                message: data.message || 'Data tidak dapat dihapus. Silakan coba kembali.',
+                                buttonText: 'Tutup',
+                                type: 'danger'
+                            });
+                            btnDeleteAll.disabled = false;
+                            btnDeleteAll.textContent = '🗑️ Hapus Semua Data';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('❌ Error:', error);
+                        openConfirmModal({
+                            title: 'Riwayat Gagal Dihapus',
+                            message: 'Terjadi kesalahan sistem: ' + error.message,
+                            buttonText: 'Tutup',
+                            type: 'danger'
+                        });
+                        btnDeleteAll.disabled = false;
+                        btnDeleteAll.textContent = '🗑️ Hapus Semua Data';
+                    });
                 }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => { throw new Error(err.message || 'Server error'); });
-                }
-                return response.json();
-            })
-            .then(data => {
-
-                if (data.success) {
-                    alert('✅ ' + data.message);
-                    location.reload();
-                } else {
-                    alert('❌ Gagal menghapus data: ' + data.message);
-                    btnDeleteAll.disabled = false;
-                    btnDeleteAll.textContent = '🗑️ Hapus Semua';
-                }
-            })
-            .catch(error => {
-                console.error('❌ Error:', error);
-                alert('❌ Terjadi kesalahan: ' + error.message);
-                btnDeleteAll.disabled = false;
-                btnDeleteAll.textContent = '🗑️ Hapus Semua';
             });
         });
     }

@@ -1103,8 +1103,8 @@ class SensorController extends Controller
 
         session()->flash('popup', [
             'type'    => 'success',
-            'title'   => 'Konfigurasi Berhasil Disimpan',
-            'message' => 'Nilai threshold sensor dan klasifikasi risiko berhasil diperbarui.',
+            'title'   => 'Konfigurasi Berhasil Direset',
+            'message' => 'Nilai threshold berhasil dikembalikan ke konfigurasi default penelitian.',
         ]);
 
         return redirect()->route('admin.dashboard', ['section' => 'threshold']);
@@ -1163,14 +1163,24 @@ class SensorController extends Controller
     public function deleteUser(User $user)
     {
         if ($user->id === Auth::id()) {
-            return redirect()->route('admin.dashboard', ['section' => 'users'])
-                ->with('error', 'Tidak dapat menghapus akun sendiri.');
+            session()->flash('popup', [
+                'type'    => 'error',
+                'title'   => 'Pengguna Gagal Dihapus',
+                'message' => 'Tidak dapat menghapus akun sendiri.',
+            ]);
+            return redirect()->route('admin.dashboard', ['section' => 'users']);
         }
 
+        $userName = $user->name;
         $user->delete();
 
-        return redirect()->route('admin.dashboard', ['section' => 'users'])
-            ->with('success', '🗑️ Pengguna berhasil dihapus.');
+        session()->flash('popup', [
+            'type'    => 'success',
+            'title'   => 'Pengguna Berhasil Dihapus',
+            'message' => 'Akun Petani ' . $userName . ' berhasil dihapus.',
+        ]);
+
+        return redirect()->route('admin.dashboard', ['section' => 'users']);
     }
 
     public function debugFuzzy(Request $request)
@@ -1333,12 +1343,21 @@ class SensorController extends Controller
 
             $data->delete();
 
-            return redirect()->route('admin.riwayat')
-                ->with('success', '🗑️ Data riwayat berhasil dihapus.');
+            session()->flash('popup', [
+                'type'    => 'success',
+                'title'   => 'Data Berhasil Dihapus',
+                'message' => 'Data riwayat berhasil dihapus.',
+            ]);
+
+            return redirect()->route('admin.riwayat');
         } catch (\Exception $e) {
             Log::error('Gagal hapus data ID ' . $id . ': ' . $e->getMessage());
-            return redirect()->route('admin.riwayat')
-                ->with('error', '❌ Gagal menghapus data: ' . $e->getMessage());
+            session()->flash('popup', [
+                'type'    => 'error',
+                'title'   => 'Data Gagal Dihapus',
+                'message' => 'Data tidak dapat dihapus. Silakan coba kembali.',
+            ]);
+            return redirect()->route('admin.riwayat');
         }
     }
 

@@ -342,6 +342,7 @@
 <body>
 
 @include('components.popup-alert')
+@include('components.confirm-dialog')
 
 <div class="mobile-topbar">
     <button onclick="toggleSidebar()" aria-label="Buka menu"><i data-feather="menu"></i></button>
