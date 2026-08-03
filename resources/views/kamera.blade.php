@@ -134,14 +134,14 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
     </div>
     <div id="header-pill">
         @if($isOnline)
-            <div class="live-pill"><span class="live-dot"></span> LIVE MONITORING</div>
+            <div class="live-pill" style="background:#16a34a;">🟢 SENSOR AKTIF</div>
         @else
             <div class="offline-pill">📡 ALAT OFFLINE</div>
         @endif
     </div>
 </div>
 
-{{-- ── KARTU DATA LIVE (dari Cache IoT) ── --}}
+{{-- ── KARTU DATA SENSOR (dari Cache IoT) ── --}}
 <div class="card-box">
 
     <div class="card-item gradient-red">
@@ -195,10 +195,6 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
         <div class="panel-body">
 
             <div class="kamera-box" id="camBox">
-                <div class="badge-live" id="badge-live" style="{{ $isOnline ? '' : 'display:none;' }}">
-                    <span style="width:6px;height:6px;background:white;border-radius:50%;display:inline-block;animation:blink 1s infinite;"></span>
-                    LIVE
-                </div>
 
                 <div id="cam-content-wrapper" style="width:100%;height:100%;">
                     <div class="cam-placeholder">
@@ -398,13 +394,13 @@ function fetchLatestCameraData() {
                 return;
             }
 
-            var badgeLive = document.getElementById('badge-live');
-            if (badgeLive) badgeLive.style.display = 'flex';
-
+            // ── UPDATE HEADER PILL ──
             var headerPill = document.getElementById('header-pill');
-            if (headerPill) headerPill.innerHTML =
-                '<div class="live-pill"><span class="live-dot"></span> LIVE MONITORING</div>';
+            if (headerPill) {
+                headerPill.innerHTML = '<div class="live-pill" style="background:#16a34a;">🟢 SENSOR AKTIF</div>';
+            }
 
+            // ── UPDATE DATA SENSOR ──
             elSet('mini-suhu',        data.suhu);
             elSet('mini-kel-udara',   data.kelembapan_udara);
             elSet('mini-kel-tanah',   data.kelembapan_tanah);
@@ -428,23 +424,41 @@ function fetchLatestCameraData() {
                 miniCard.className = 'card-item ' + (fuzzyStatusText === 'TINGGI' ? 'status-high' : (fuzzyStatusText === 'SEDANG' ? 'status-medium' : 'status-low'));
             }
 
+            // ── UPDATE GAMBAR UTAMA ──
             var cw = document.getElementById('cam-content-wrapper');
             if (cw) {
                 if (data.image) {
                     var chipClass = data.status === 'HAMA' ? 'chip-hama'
                                  : (data.status === 'WASPADA' ? 'chip-waspada' : 'chip-aman');
                     var imageUrl = data.image + '?t=' + Date.now();
-                    cw.innerHTML =
-                        '<img src="' + imageUrl + '" alt="Gambar tanaman jagung dari kamera IoT">' +
-                        '<div class="cam-overlay">' +
-                        '  <span class="cam-timestamp">' + data.formatted_timestamp + '</span>' +
-                        '  <span class="cam-status-chip ' + chipClass + '">' + data.status + '</span>' +
-                        '</div>';
+
+                    if (data.is_live) {
+                        // ── PRIORITAS 1: GAMBAR TERBARU (kamera fresh) ──
+                        cw.innerHTML =
+                            '<img src="' + imageUrl + '" alt="Gambar tanaman jagung dari kamera IoT">' +
+                            '<div class="cam-overlay">' +
+                            '  <span class="cam-timestamp">' + data.formatted_timestamp + '</span>' +
+                            '  <span class="cam-status-chip ' + chipClass + '">' + data.status + '</span>' +
+                            '</div>';
+                    } else {
+                        // ── PRIORITAS 2: GAMBAR TERAKHIR DARI DATABASE (kamera expired) ──
+                        var fbTs = data.fallback_timestamp || data.formatted_timestamp || '';
+                        cw.innerHTML =
+                            '<img src="' + imageUrl + '" alt="Gambar terakhir dari kamera IoT" style="opacity:0.85;">' +
+                            '<div class="cam-overlay">' +
+                            '  <span class="cam-timestamp" style="display:flex;flex-direction:column;gap:2px;">' +
+                            '    <span style="background:rgba(100,116,139,0.85);color:white;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;">📷 GAMBAR TERAKHIR DITERIMA</span>' +
+                            '    <span>' + fbTs + '</span>' +
+                            '  </span>' +
+                            '  <span class="cam-status-chip chip-offline">KAMERA TIDAK AKTIF</span>' +
+                            '</div>';
+                    }
                 } else {
+                    // ── PRIORITAS 3: TIDAK ADA GAMBAR ──
                     cw.innerHTML =
                         '<div class="cam-placeholder">' +
                         '  <span class="ph-icon">📷</span>' +
-                        '  <span>Belum ada gambar dari kamera IoT</span>' +
+                        '  <span>Belum ada gambar dari kamera</span>' +
                         '  <span style="font-size:11px;opacity:0.6;">Gambar akan tampil saat ESP32-CAM mengirim foto</span>' +
                         '</div>';
                 }
@@ -533,6 +547,7 @@ function fetchLatestCameraData() {
             if (riwayatWrapper && data.riwayat_html) {
                 riwayatWrapper.innerHTML = data.riwayat_html;
             }
+        })
         .catch(function(err) {
             console.error('Gagal memperbarui data monitor kamera:', err);
             var riwayatWrapper = document.getElementById('riwayat-foto-wrapper');
@@ -543,8 +558,7 @@ function fetchLatestCameraData() {
 }
 
 function setKameraOffline() {
-    var badgeLive = document.getElementById('badge-live');
-    if (badgeLive) badgeLive.style.display = 'none';
+
 
     var headerPill = document.getElementById('header-pill');
     if (headerPill) headerPill.innerHTML = '<div class="offline-pill">📡 ALAT OFFLINE</div>';

@@ -255,6 +255,24 @@ class SensorController extends Controller
             }
         }
 
+        // ── FALLBACK: GAMBAR TERAKHIR DARI DATABASE ──
+        // Jika gambar live tidak fresh, cari record terbaru dengan gambar valid
+        $fallbackImageUrl = null;
+        $fallbackTimestamp = null;
+        if (!$isCameraFresh) {
+            $fallbackRecord = SensorReading::whereNotNull('image')
+                ->whereIn('deteksi_yolo', ['ON', 'OFF'])
+                ->latest()
+                ->first();
+
+            if ($fallbackRecord && $fallbackRecord->image && Storage::disk('public')->exists($fallbackRecord->image)) {
+                $fallbackImageUrl = asset('storage/' . $fallbackRecord->image);
+                $fallbackTimestamp = $fallbackRecord->created_at
+                    ? $fallbackRecord->created_at->format('d M Y — H:i:s')
+                    : null;
+            }
+        }
+
         return response()->json([
             'success'             => true,
             'isOnline'            => true,
@@ -263,7 +281,10 @@ class SensorController extends Controller
             'kelembapan_tanah'    => $d['kelembapan_tanah'],
             'nilai'               => round($d['nilai_fuzzy'], 4),
             'status'              => $d['deteksi'],
-            'image'               => $isCameraFresh ? $liveImageUrl : null,
+            'image'               => $isCameraFresh ? $liveImageUrl : $fallbackImageUrl,
+            'is_live'             => $isCameraFresh,
+            'fallback_image'      => $fallbackImageUrl,
+            'fallback_timestamp'  => $fallbackTimestamp,
             'camera_fresh'        => $isCameraFresh,
             'deteksi_yolo'        => $d['deteksi_yolo'] ?? null,
             'confidence_yolo'     => $d['confidence_yolo'] ?? null,
