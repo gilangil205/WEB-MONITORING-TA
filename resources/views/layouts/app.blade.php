@@ -341,6 +341,8 @@
 </head>
 <body>
 
+@include('components.popup-alert')
+
 <div class="mobile-topbar">
     <button onclick="toggleSidebar()" aria-label="Buka menu"><i data-feather="menu"></i></button>
     <span class="mt-title">🌽 SmartFarm</span>
@@ -439,32 +441,7 @@
 </div>
 
 <div class="main">
-    {{-- Alert sukses --}}
-    @if(session('success'))
-        <div class="alert-success">{{ session('success') }}</div>
-    @endif
-
-    {{-- Alert error --}}
-    @if(session('error'))
-        <div class="alert-error">🚫 {{ session('error') }}</div>
-    @endif
-
-    {{-- Alert info --}}
-    @if(session('info'))
-        <div class="alert-info">ℹ️ {{ session('info') }}</div>
-    @endif
-
-    {{-- Validation error dari form admin --}}
-    @if($errors->has('threshold') || $errors->has('suhu'))
-        <div class="alert-error">
-            ⚠️
-            @if($errors->has('threshold')) {{ $errors->first('threshold') }} @endif
-            @if($errors->has('suhu'))      {{ $errors->first('suhu') }} @endif
-        </div>
-    @endif
-
     @yield('content')
-
 </div>
 
 <div id="popupWarning" class="popup-warning">

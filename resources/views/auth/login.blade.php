@@ -248,6 +248,7 @@
 </head>
 
 <body>
+    @include('components.popup-alert')
 
     <div class="left-side">
 
@@ -272,13 +273,7 @@
                 </p>
             </div>
 
-            @if (session('status'))
-                <div class="status-message">
-                    {{ session('status') }}
-                </div>
-            @endif
-
-            <form method="POST" action="{{ route('login') }}">
+            <form method="POST" action="{{ route('login') }}" novalidate>
                 @csrf
 
                 <div class="form-group">

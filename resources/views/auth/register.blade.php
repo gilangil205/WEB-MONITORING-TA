@@ -182,6 +182,7 @@
 </head>
 
 <body>
+    @include('components.popup-alert')
 
     <div class="left-side">
         <div class="brand">
@@ -202,7 +203,7 @@
                 </p>
             </div>
 
-            <form method="POST" action="{{ route('register') }}">
+            <form method="POST" action="{{ route('register') }}" novalidate>
                 @csrf
 
                 <!-- Nama Lengkap -->

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Collection;
 
 class SensorController extends Controller
@@ -1000,7 +1001,7 @@ class SensorController extends Controller
 
     public function updateThreshold(Request $request)
     {
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'settings.suhu_aman'         => 'required|numeric',
             'settings.suhu_waspada'      => 'required|numeric',
             'settings.suhu_hama'         => 'required|numeric',
@@ -1013,6 +1014,15 @@ class SensorController extends Controller
             'settings.threshold_hama'    => 'required|numeric|between:0.01,0.99',
             'settings.threshold_waspada' => 'required|numeric|between:0.01,0.99',
         ]);
+
+        if ($validator->fails()) {
+            session()->flash('popup', [
+                'type'    => 'error',
+                'title'   => 'Konfigurasi Gagal Disimpan',
+                'message' => 'Periksa kembali nilai batas yang dimasukkan.',
+            ]);
+            return back()->withErrors($validator)->withInput();
+        }
 
         $s = $request->input('settings');
 
@@ -1028,12 +1038,22 @@ class SensorController extends Controller
             $vHama    = (float) $s[$kHama];
 
             if ($vAman >= $vWaspada) {
-                return back()->withInput()
-                    ->with('error', "❌ {$label}: Batas AMAN harus lebih kecil dari batas WASPADA.");
+                $err = "{$label}: Batas AMAN harus lebih kecil dari batas WASPADA.";
+                session()->flash('popup', [
+                    'type'    => 'error',
+                    'title'   => 'Konfigurasi Gagal Disimpan',
+                    'message' => $err,
+                ]);
+                return back()->withInput();
             }
             if ($vWaspada >= $vHama) {
-                return back()->withInput()
-                    ->with('error', "❌ {$label}: Batas WASPADA harus lebih kecil dari batas HAMA.");
+                $err = "{$label}: Batas WASPADA harus lebih kecil dari batas HAMA.";
+                session()->flash('popup', [
+                    'type'    => 'error',
+                    'title'   => 'Konfigurasi Gagal Disimpan',
+                    'message' => $err,
+                ]);
+                return back()->withInput();
             }
         }
 
@@ -1041,8 +1061,13 @@ class SensorController extends Controller
             $tw = (float) $s['threshold_waspada'];
             $th = (float) $s['threshold_hama'];
             if ($tw >= $th) {
-                return back()->withInput()
-                    ->with('error', '❌ Threshold WASPADA harus lebih kecil dari threshold HAMA.');
+                $err = 'Threshold WASPADA harus lebih kecil dari threshold HAMA.';
+                session()->flash('popup', [
+                    'type'    => 'error',
+                    'title'   => 'Konfigurasi Gagal Disimpan',
+                    'message' => $err,
+                ]);
+                return back()->withInput();
             }
         }
 
@@ -1052,8 +1077,13 @@ class SensorController extends Controller
 
         ThresholdSetting::clearCache();
 
-        return redirect()->route('admin.dashboard', ['section' => 'threshold'])
-            ->with('success', '✅ Pengaturan kondisi ideal berhasil diperbarui.');
+        session()->flash('popup', [
+            'type'    => 'success',
+            'title'   => 'Konfigurasi Berhasil Disimpan',
+            'message' => 'Nilai threshold sensor dan klasifikasi risiko berhasil diperbarui.',
+        ]);
+
+        return redirect()->route('admin.dashboard', ['section' => 'threshold']);
     }
 
     public function resetThreshold()
@@ -1071,28 +1101,63 @@ class SensorController extends Controller
 
         ThresholdSetting::clearCache();
 
-        return redirect()->route('admin.dashboard', ['section' => 'threshold'])
-            ->with('success', '🔄 Pengaturan dikembalikan ke nilai default penelitian.');
+        session()->flash('popup', [
+            'type'    => 'success',
+            'title'   => 'Konfigurasi Berhasil Disimpan',
+            'message' => 'Nilai threshold sensor dan klasifikasi risiko berhasil diperbarui.',
+        ]);
+
+        return redirect()->route('admin.dashboard', ['section' => 'threshold']);
     }
 
     public function storeUser(Request $request)
     {
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|max:255|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
             'role'     => 'required|in:user',
+        ], [
+            'name.required'      => 'Nama lengkap wajib diisi.',
+            'email.required'     => 'Email wajib diisi.',
+            'email.email'        => 'Format email tidak valid.',
+            'email.unique'       => 'Email tersebut sudah terdaftar pada sistem.',
+            'password.required'  => 'Password wajib diisi.',
+            'password.min'       => 'Password minimal 8 karakter.',
+            'password.confirmed' => 'Konfirmasi password tidak sesuai.',
         ]);
 
-        User::create([
+        if ($validator->fails()) {
+            $msg = $validator->errors()->first();
+            if ($validator->errors()->has('email') && str_contains($validator->errors()->first('email'), 'terdaftar')) {
+                $msg = 'Email tersebut sudah terdaftar pada sistem.';
+            } elseif ($validator->errors()->has('password') && str_contains($validator->errors()->first('password'), 'konfirmasi')) {
+                $msg = 'Konfirmasi password tidak sesuai.';
+            }
+
+            session()->flash('popup', [
+                'type'    => 'error',
+                'title'   => 'Pengguna Gagal Ditambahkan',
+                'message' => $msg,
+            ]);
+
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $user = User::create([
             'name'     => $request->name,
             'email'    => $request->email,
             'password' => $request->password,
             'role'     => 'user',
         ]);
 
-        return redirect()->route('admin.dashboard', ['section' => 'users'])
-            ->with('success', '✅ Pengguna baru (Petani) berhasil ditambahkan.');
+        session()->flash('popup', [
+            'type'    => 'success',
+            'title'   => 'Pengguna Berhasil Ditambahkan',
+            'message' => 'Akun Petani ' . $user->name . ' berhasil dibuat.',
+        ]);
+
+        return redirect()->route('admin.dashboard', ['section' => 'users']);
     }
 
     public function deleteUser(User $user)

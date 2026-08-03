@@ -28,13 +28,24 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $user = $request->user();
+
         // ── KONDISI PENGALIHAN BERDASARKAN ROLE ───────────────────────────
-        // Jika yang login adalah admin, PAKSA langsung ke route admin tanpa mengikuti intended URL lama
-        if ($request->user()->isAdmin()) {
+        if ($user->isAdmin()) {
+            session()->flash('popup', [
+                'type'    => 'success',
+                'title'   => 'Login Berhasil',
+                'message' => 'Selamat datang, ' . $user->name . '. Anda berhasil masuk sebagai Administrator.',
+            ]);
             return redirect()->route('admin.dashboard');
         }
 
-        // Jika user biasa, biarkan menggunakan intended bawaan Breeze
+        session()->flash('popup', [
+            'type'    => 'success',
+            'title'   => 'Login Berhasil',
+            'message' => 'Selamat datang, ' . $user->name . '. Anda berhasil masuk sebagai Petani.',
+        ]);
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

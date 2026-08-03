@@ -176,16 +176,6 @@
     </div>
 </div>
 
-@if(session('success'))
-    <div style="background:#f0fdf4;border:0.5px solid #86efac;border-radius:8px;
-        padding:10px 14px;font-size:12px;color:#166534;margin-bottom:16px;font-weight:600;">
-        {{ session('success') }}
-    </div>
-@endif
-@if(session('error'))
-    <div class="val-error">{{ session('error') }}</div>
-@endif
-
 @if($activeSection === 'users')
 
     {{-- ============================================================ --}}
@@ -199,7 +189,7 @@
                     <div class="panel-title">👥 Tambah pengguna baru</div>
                 </div>
                 <div class="panel-body">
-                    <form action="{{ route('admin.users.store') }}" method="POST">
+                    <form action="{{ route('admin.users.store') }}" method="POST" novalidate>
                         @csrf
                         <div class="form-group">
                             <span class="form-label-text">Nama lengkap</span>
@@ -342,7 +332,7 @@
         };
     @endphp
 
-    <form action="{{ route('admin.threshold.update') }}" method="POST" id="formThreshold">
+    <form action="{{ route('admin.threshold.update') }}" method="POST" id="formThreshold" novalidate>
         @csrf
 
         {{-- SUHU UDARA --}}
