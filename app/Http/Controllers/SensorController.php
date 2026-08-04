@@ -39,20 +39,35 @@ class SensorController extends Controller
         );
     }
 
+    // ================== HELPER: YOLO FRESHNESS ==================
+    private function isYoloFresh(): bool
+    {
+        $latestYoloUpdatedAt = \Illuminate\Support\Facades\Cache::get('latest_yolo_updated_at');
+        if (!$latestYoloUpdatedAt && \Illuminate\Support\Facades\Cache::has('yolo_live_data')) {
+            $yoloData = \Illuminate\Support\Facades\Cache::get('yolo_live_data');
+            $latestYoloUpdatedAt = $yoloData['updated_at'] ?? null;
+        }
+        if (!$latestYoloUpdatedAt) {
+            return false;
+        }
+        return \Carbon\Carbon::parse($latestYoloUpdatedAt)->diffInMinutes(now()) <= self::CAMERA_EXPIRATION_MINUTES;
+    }
+
     // ================== HELPER: STATUS GLOBAL ==================
     private function getStatusGlobal()
     {
         if (\Illuminate\Support\Facades\Cache::has('iot_live_data')) {
             $cache = \Illuminate\Support\Facades\Cache::get('iot_live_data');
             
-            if (\Illuminate\Support\Facades\Cache::has('yolo_live_data')) {
+            if ($this->isYoloFresh() && \Illuminate\Support\Facades\Cache::has('yolo_live_data')) {
                 $yolo = \Illuminate\Support\Facades\Cache::get('yolo_live_data');
                 $hasilDeteksiYolo = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
                 $prediksiSensor = $cache['prediksi_sensor'] ?? 'AMAN';
                 return $this->getSystemDecision($hasilDeteksiYolo, $prediksiSensor);
             }
             
-            return $cache['keputusan_sistem'] ?? ($cache['deteksi'] ?? 'AMAN');
+            $prediksiSensor = $cache['prediksi_sensor'] ?? ($cache['deteksi'] ?? 'AMAN');
+            return $this->getSystemDecision('OFF', $prediksiSensor);
         }
         
         return 'OFFLINE';
@@ -188,14 +203,17 @@ class SensorController extends Controller
     // ================== ENDPOINT: /api/kamera/latest ==================
     public function kameraLatest()
     {
-        $isOnline = Cache::has('iot_live_data');
+        $isOnline    = Cache::has('iot_live_data');
+        $isYoloFresh = $this->isYoloFresh();
+        $sensorLastUpdatedAt = null;
 
         if ($isOnline) {
             $d         = Cache::get('iot_live_data');
-            $updatedAt = isset($d['updated_at']) ? Carbon::parse($d['updated_at']) : now();
+            $updatedAt = isset($d['updated_at']) ? Carbon::parse($d['updated_at']) : null;
+            $sensorLastUpdatedAt = $updatedAt ? $updatedAt->format('d M Y — H:i:s') : null;
             
-            // ── BACA CACHE YOLO ──
-            if (Cache::has('yolo_live_data')) {
+            // ── BACA CACHE YOLO JIKA FRESH ──
+            if ($isYoloFresh && Cache::has('yolo_live_data')) {
                 $yolo = Cache::get('yolo_live_data');
                 $d['deteksi_yolo']       = $yolo['deteksi_yolo'] ?? null;
                 $d['confidence_yolo']    = $yolo['confidence_yolo'] ?? null;
@@ -203,39 +221,43 @@ class SensorController extends Controller
                 
                 // Kalkulasi ulang Keputusan Sistem
                 $d['keputusan_sistem'] = $this->getSystemDecision($d['hasil_deteksi_yolo'], $d['prediksi_sensor'] ?? 'AMAN');
-                $d['deteksi'] = $d['keputusan_sistem'];
+                $d['deteksi']          = $d['keputusan_sistem'];
+            } else {
+                $d['deteksi_yolo']       = null;
+                $d['confidence_yolo']    = null;
+                $d['hasil_deteksi_yolo'] = 'DATA TIDAK TERSEDIA';
+                $d['keputusan_sistem']   = $d['prediksi_sensor'] ?? ($d['deteksi'] ?? 'AMAN');
+                $d['deteksi']            = $d['keputusan_sistem'];
             }
         } else {
-            $latestReading = SensorReading::latest()->first();
-            if ($latestReading) {
-                $d = [
-                    'suhu'             => $latestReading->suhu,
-                    'kelembapan_udara' => $latestReading->kelembapan_udara,
-                    'kelembapan_tanah' => $latestReading->kelembapan_tanah,
-                    'nilai_fuzzy'      => $latestReading->nilai_fuzzy ?? 0,
-                    'deteksi'          => $latestReading->deteksi ?? 'AMAN',
-                    'prediksi_sensor'  => $latestReading->deteksi ?? 'AMAN',
-                    'hasil_deteksi_yolo' => ($latestReading->deteksi_yolo === 'ON') ? 'ON' : 'OFF',
-                    'keputusan_sistem' => $latestReading->deteksi ?? 'AMAN',
-                ];
-                $updatedAt = $latestReading->created_at;
+            $latestSensorReading = SensorReading::whereNotNull('suhu')->whereNotNull('kelembapan_udara')->latest()->first();
+            if ($latestSensorReading && $latestSensorReading->created_at) {
+                $sensorLastUpdatedAt = $latestSensorReading->created_at->format('d M Y — H:i:s');
+            }
 
-                if (Cache::has('yolo_live_data')) {
-                    $yolo = Cache::get('yolo_live_data');
-                    $d['deteksi_yolo']       = $yolo['deteksi_yolo'] ?? null;
-                    $d['confidence_yolo']    = $yolo['confidence_yolo'] ?? null;
-                    $d['hasil_deteksi_yolo'] = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
-                    $d['keputusan_sistem']   = $this->getSystemDecision($d['hasil_deteksi_yolo'], $d['prediksi_sensor']);
-                    $d['deteksi']            = $d['keputusan_sistem'];
+            $updatedAt = null;
+            $d = [
+                'suhu'               => null,
+                'kelembapan_udara'   => null,
+                'kelembapan_tanah'   => null,
+                'nilai_fuzzy'        => null,
+                'deteksi'            => 'DATA TIDAK TERSEDIA',
+                'prediksi_sensor'    => 'DATA TIDAK TERSEDIA',
+                'hasil_deteksi_yolo' => 'DATA TIDAK TERSEDIA',
+                'keputusan_sistem'   => 'DATA TIDAK TERSEDIA',
+                'deteksi_yolo'       => null,
+                'confidence_yolo'    => null,
+            ];
+
+            if ($isYoloFresh && Cache::has('yolo_live_data')) {
+                $yolo = Cache::get('yolo_live_data');
+                $d['deteksi_yolo']       = $yolo['deteksi_yolo'] ?? null;
+                $d['confidence_yolo']    = $yolo['confidence_yolo'] ?? null;
+                $d['hasil_deteksi_yolo'] = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
+                if ($d['hasil_deteksi_yolo'] === 'ON') {
+                    $d['keputusan_sistem'] = 'HAMA';
+                    $d['deteksi']          = 'HAMA';
                 }
-            } else {
-                $fotoData    = SensorReading::whereNotNull('image')->latest()->take(5)->get();
-                $riwayatHtml = $this->buildRiwayatHtml($fotoData);
-                return response()->json([
-                    'success'      => false,
-                    'isOnline'     => false,
-                    'riwayat_html' => $riwayatHtml,
-                ]);
             }
         }
 
@@ -245,6 +267,7 @@ class SensorController extends Controller
 
         // ── CEK KEDALUWARSA GAMBAR LIVE KAMERA ──
         $cameraLastUpdatedAt = Cache::get('camera_last_updated_at');
+        $formattedCameraLastUpdatedAt = $cameraLastUpdatedAt ? Carbon::parse($cameraLastUpdatedAt)->format('d M Y — H:i:s') : null;
         $isCameraFresh = false;
         $liveImageUrl = null;
 
@@ -275,32 +298,42 @@ class SensorController extends Controller
         }
 
         return response()->json([
-            'success'             => true,
-            'isOnline'            => true,
-            'suhu'                => $d['suhu'],
-            'kelembapan_udara'    => $d['kelembapan_udara'],
-            'kelembapan_tanah'    => $d['kelembapan_tanah'],
-            'nilai'               => round($d['nilai_fuzzy'], 4),
-            'status'              => $d['deteksi'],
-            'image'               => $isCameraFresh ? $liveImageUrl : $fallbackImageUrl,
-            'is_live'             => $isCameraFresh,
-            'fallback_image'      => $fallbackImageUrl,
-            'fallback_timestamp'  => $fallbackTimestamp,
-            'camera_fresh'        => $isCameraFresh,
-            'deteksi_yolo'        => $d['deteksi_yolo'] ?? null,
-            'confidence_yolo'     => $d['confidence_yolo'] ?? null,
-            'prediksi_sensor'     => $d['prediksi_sensor'] ?? ($d['deteksi'] ?? 'AMAN'),
-            'hasil_deteksi_yolo'  => $d['hasil_deteksi_yolo'] ?? 'OFF',
-            'keputusan_sistem'    => $d['keputusan_sistem'] ?? ($d['deteksi'] ?? 'AMAN'),
-            'formatted_timestamp' => $updatedAt->format('d M Y — H:i:s'),
-            'formatted_time'      => $updatedAt->format('H:i, d M Y'),
-            'rekomendasi'         => $rekomendasi,
-            'riwayat_html'        => $riwayatHtml,
+            'success'                => true,
+            'isOnline'               => $isOnline,
+            'sensor_online'          => $isOnline,
+            'suhu'                   => $d['suhu'],
+            'kelembapan_udara'       => $d['kelembapan_udara'],
+            'kelembapan_tanah'       => $d['kelembapan_tanah'],
+            'nilai'                  => is_numeric($d['nilai_fuzzy']) ? round((float)$d['nilai_fuzzy'], 4) : null,
+            'status'                 => $d['deteksi'],
+            'image'                  => $isCameraFresh ? $liveImageUrl : $fallbackImageUrl,
+            'is_live'                => $isCameraFresh,
+            'fallback_image'         => $fallbackImageUrl,
+            'fallback_timestamp'     => $fallbackTimestamp,
+            'camera_fresh'           => $isCameraFresh,
+            'camera_last_updated_at' => $formattedCameraLastUpdatedAt,
+            'sensor_last_updated_at' => $sensorLastUpdatedAt,
+            'deteksi_yolo'           => $d['deteksi_yolo'] ?? null,
+            'confidence_yolo'        => $d['confidence_yolo'] ?? null,
+            'prediksi_sensor'        => $d['prediksi_sensor'] ?? 'DATA TIDAK TERSEDIA',
+            'hasil_deteksi_yolo'     => $d['hasil_deteksi_yolo'] ?? 'DATA TIDAK TERSEDIA',
+            'keputusan_sistem'       => $d['keputusan_sistem'] ?? 'DATA TIDAK TERSEDIA',
+            'formatted_timestamp'    => $updatedAt ? $updatedAt->format('d M Y — H:i:s') : null,
+            'formatted_time'         => $updatedAt ? $updatedAt->format('H:i, d M Y') : null,
+            'rekomendasi'            => $rekomendasi,
+            'riwayat_html'           => $riwayatHtml,
         ]);
     }
 
     private function getRekomendasiByStatus(string $status): array
     {
+        if ($status === 'OFFLINE' || $status === 'DATA TIDAK TERSEDIA') {
+            return [
+                'Periksa koneksi jaringan dan catu daya perangkat IoT.',
+                'Pastikan modul ESP32 menyala dan terhubung dengan titik akses WiFi.',
+                'Pantau kembali status alat setelah koneksi berhasil dipulihkan.',
+            ];
+        }
         if ($status === 'HAMA') {
             return [
                 'Hentikan kegiatan penyiraman berlebih untuk mengurangi kelembapan.',
@@ -942,7 +975,8 @@ class SensorController extends Controller
         $statusGlobal = $this->getStatusGlobal();
         view()->share('statusGlobal', $statusGlobal);
 
-        $isOnline = Cache::has('iot_live_data');
+        $isOnline    = Cache::has('iot_live_data');
+        $isYoloFresh = $this->isYoloFresh();
 
         if ($isOnline) {
             $cache  = Cache::get('iot_live_data');
@@ -950,7 +984,7 @@ class SensorController extends Controller
             $status = $cache['keputusan_sistem'] ?? $cache['deteksi'] ?? 'AMAN';
             [$statusFuzzy, $class] = $this->getStatus($nilai);
 
-            if (Cache::has('yolo_live_data')) {
+            if ($isYoloFresh && Cache::has('yolo_live_data')) {
                 $yolo = Cache::get('yolo_live_data');
                 $hasilDeteksiYolo = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
                 $prediksiSensor = $cache['prediksi_sensor'] ?? 'AMAN';
@@ -961,19 +995,39 @@ class SensorController extends Controller
 
             if (!$latest) {
                 $latest = new \stdClass();
-                $latest->suhu             = $cache['suhu'];
-                $latest->kelembapan_udara = $cache['kelembapan_udara'];
-                $latest->kelembapan_tanah = $cache['kelembapan_tanah'];
                 $latest->image            = null;
                 $latest->created_at       = Carbon::parse($cache['updated_at'] ?? now());
                 $latest->deteksi_yolo     = $cache['deteksi_yolo'] ?? null;
                 $latest->confidence_yolo  = $cache['confidence_yolo'] ?? null;
             }
+
+            $latest->suhu             = $cache['suhu'] ?? null;
+            $latest->kelembapan_udara = $cache['kelembapan_udara'] ?? null;
+            $latest->kelembapan_tanah = $cache['kelembapan_tanah'] ?? null;
+            $latest->nilai_fuzzy      = $cache['nilai_fuzzy'] ?? null;
         } else {
             $latest = SensorReading::whereNotNull('image')->latest()->first();
-            $nilai  = $latest->nilai_fuzzy ?? 0;
-            $status = $latest->deteksi ?? 'AMAN';
-            [$statusFuzzy, $class] = $this->getStatus($nilai);
+            if (!$latest) {
+                $latest = new \stdClass();
+                $latest->image = null;
+            }
+            $latest->suhu             = null;
+            $latest->kelembapan_udara = null;
+            $latest->kelembapan_tanah = null;
+            $latest->nilai_fuzzy      = null;
+
+            $nilai       = null;
+            $status      = 'DATA TIDAK TERSEDIA';
+            $statusFuzzy = 'DATA TIDAK TERSEDIA';
+            $class       = 'mc-status-offline';
+
+            if ($isYoloFresh && Cache::has('yolo_live_data')) {
+                $yolo = Cache::get('yolo_live_data');
+                if (($yolo['hasil_deteksi_yolo'] ?? 'OFF') === 'ON') {
+                    $status = 'HAMA';
+                    $class  = 'mc-status-hama';
+                }
+            }
         }
 
         $fotoData = SensorReading::whereNotNull('image')->latest()->take(5)->get();

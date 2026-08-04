@@ -169,7 +169,7 @@ body { background: var(--bg); font-family: 'Space Grotesk', sans-serif; }
         @else status-low
         @endif">
         <h4>⚠️ Tingkat Risiko Lingkungan (Fuzzy Sugeno)</h4>
-        <p id="mini-val-status">{{ $isOnline ? ($status=='HAMA' ? 'TINGGI' : ($status=='WASPADA' ? 'SEDANG' : ($status=='AMAN' ? 'RENDAH' : $status))) : 'OFFLINE' }}</p>
+        <p id="mini-val-status">{{ $isOnline ? ($status=='HAMA' ? 'TINGGI' : ($status=='WASPADA' ? 'SEDANG' : ($status=='AMAN' ? 'RENDAH' : $status))) : 'DATA TIDAK TERSEDIA' }}</p>
         <small>Nilai Fuzzy: <span id="mini-fuzzy-val">{{ $isOnline ? number_format($nilai ?? 0, 3) : '--' }}</span></small>
     </div>
 
@@ -388,43 +388,108 @@ function fetchLatestCameraData() {
     fetch("{{ route('kamera.api') }}")
         .then(function(r) { return r.json(); })
         .then(function(data) {
+            if (!data.success) return;
 
-            if (!data.success || !data.isOnline) {
-                setKameraOffline();
-                return;
-            }
+            var isSensorOnline = data.isOnline || data.sensor_online;
 
             // ── UPDATE HEADER PILL ──
             var headerPill = document.getElementById('header-pill');
             if (headerPill) {
-                headerPill.innerHTML = '<div class="live-pill" style="background:#16a34a;">🟢 SENSOR AKTIF</div>';
+                if (isSensorOnline) {
+                    headerPill.innerHTML = '<div class="live-pill" style="background:#16a34a;">🟢 SENSOR AKTIF</div>';
+                } else {
+                    headerPill.innerHTML = '<div class="offline-pill">📡 ALAT OFFLINE</div>';
+                }
             }
 
-            // ── UPDATE DATA SENSOR ──
-            elSet('mini-suhu',        data.suhu);
-            elSet('mini-kel-udara',   data.kelembapan_udara);
-            elSet('mini-kel-tanah',   data.kelembapan_tanah);
-            elSet('detail-suhu',      data.suhu + ' °C');
-            elSet('detail-kel-udara', data.kelembapan_udara + ' %');
-            elSet('detail-kel-tanah', data.kelembapan_tanah + ' %');
-            elSet('detail-time',      data.formatted_time);
+            // ── UPDATE DATA SENSOR CARDS ──
+            if (isSensorOnline) {
+                elSet('mini-suhu',        data.suhu !== null ? data.suhu : '--');
+                elSet('mini-kel-udara',   data.kelembapan_udara !== null ? data.kelembapan_udara : '--');
+                elSet('mini-kel-tanah',   data.kelembapan_tanah !== null ? data.kelembapan_tanah : '--');
+                elSet('detail-suhu',      (data.suhu !== null ? data.suhu : '--') + ' °C');
+                elSet('detail-kel-udara', (data.kelembapan_udara !== null ? data.kelembapan_udara : '--') + ' %');
+                elSet('detail-kel-tanah', (data.kelembapan_tanah !== null ? data.kelembapan_tanah : '--') + ' %');
+                elSet('detail-time',      data.formatted_time || '--');
 
-            var miniCard = document.getElementById('mini-card-status');
-            var miniVal  = document.getElementById('mini-val-status');
-            var miniFuzzyVal = document.getElementById('mini-fuzzy-val');
+                var miniCard = document.getElementById('mini-card-status');
+                var miniVal  = document.getElementById('mini-val-status');
+                var miniFuzzyVal = document.getElementById('mini-fuzzy-val');
 
-            var fuzzyStatusText = data.prediksi_sensor || (data.status === 'HAMA' ? 'TINGGI' : (data.status === 'WASPADA' ? 'SEDANG' : 'RENDAH'));
-            if (fuzzyStatusText === 'HAMA') fuzzyStatusText = 'TINGGI';
-            else if (fuzzyStatusText === 'WASPADA') fuzzyStatusText = 'SEDANG';
-            else if (fuzzyStatusText === 'AMAN') fuzzyStatusText = 'RENDAH';
+                var fuzzyStatusText = data.prediksi_sensor || (data.status === 'HAMA' ? 'TINGGI' : (data.status === 'WASPADA' ? 'SEDANG' : 'RENDAH'));
+                if (fuzzyStatusText === 'HAMA') fuzzyStatusText = 'TINGGI';
+                else if (fuzzyStatusText === 'WASPADA') fuzzyStatusText = 'SEDANG';
+                else if (fuzzyStatusText === 'AMAN') fuzzyStatusText = 'RENDAH';
 
-            if (miniVal) miniVal.innerText = fuzzyStatusText;
-            if (miniFuzzyVal) miniFuzzyVal.innerText = (parseFloat(data.nilai) || 0).toFixed(3);
-            if (miniCard) {
-                miniCard.className = 'card-item ' + (fuzzyStatusText === 'TINGGI' ? 'status-high' : (fuzzyStatusText === 'SEDANG' ? 'status-medium' : 'status-low'));
+                if (miniVal) miniVal.innerText = fuzzyStatusText;
+                if (miniFuzzyVal) miniFuzzyVal.innerText = data.nilai !== null ? (parseFloat(data.nilai) || 0).toFixed(3) : '--';
+                if (miniCard) {
+                    miniCard.className = 'card-item ' + (fuzzyStatusText === 'TINGGI' ? 'status-high' : (fuzzyStatusText === 'SEDANG' ? 'status-medium' : 'status-low'));
+                }
+
+                // Update Decision Rule Breakdown
+                var fuzzyVal = parseFloat(data.nilai) || 0;
+                elSet('dr-fuzzy-skor', data.nilai !== null ? fuzzyVal.toFixed(4) : '--');
+
+                var predBadge = document.getElementById('dr-prediksi-badge');
+                if (predBadge) {
+                    var pVal = data.prediksi_sensor || 'RENDAH';
+                    if (pVal === 'HAMA') pVal = 'TINGGI';
+                    else if (pVal === 'WASPADA') pVal = 'SEDANG';
+                    else if (pVal === 'AMAN') pVal = 'RENDAH';
+
+                    predBadge.innerText = pVal;
+                    if (pVal === 'TINGGI') {
+                        predBadge.style.background = '#fee2e2'; predBadge.style.color = '#dc2626';
+                    } else if (pVal === 'SEDANG') {
+                        predBadge.style.background = '#fef9c3'; predBadge.style.color = '#d97706';
+                    } else {
+                        predBadge.style.background = '#dcfce7'; predBadge.style.color = '#16a34a';
+                    }
+                }
+            } else {
+                // ── SENSOR OFFLINE: KOSONGKAN NILAI AKTUIL SENSOR ──
+                elSet('mini-suhu',        '--');
+                elSet('mini-kel-udara',   '--');
+                elSet('mini-kel-tanah',   '--');
+                elSet('detail-suhu',      '-- °C');
+                elSet('detail-kel-udara', '-- %');
+                elSet('detail-kel-tanah', '-- %');
+                elSet('detail-time',      'Perangkat IoT tidak terhubung');
+
+                var miniCard = document.getElementById('mini-card-status');
+                var miniVal  = document.getElementById('mini-val-status');
+                var miniFuzzyVal = document.getElementById('mini-fuzzy-val');
+                if (miniCard) miniCard.className = 'card-item status-offline';
+                if (miniVal)  miniVal.innerText  = 'DATA TIDAK TERSEDIA';
+                if (miniFuzzyVal) miniFuzzyVal.innerText = '--';
+
+                elSet('dr-fuzzy-skor', '--');
+                var predBadge = document.getElementById('dr-prediksi-badge');
+                if (predBadge) {
+                    predBadge.innerText = 'DATA TIDAK TERSEDIA';
+                    predBadge.style.background = '#e2e8f0';
+                    predBadge.style.color = '#64748b';
+                }
             }
 
-            // ── UPDATE GAMBAR UTAMA ──
+            // ── UPDATE YOLO BADGE ──
+            var yoloBadge = document.getElementById('dr-yolo-badge');
+            if (yoloBadge) {
+                var yStatus = data.hasil_deteksi_yolo;
+                if (yStatus === 'ON') {
+                    yoloBadge.innerText = 'ON - TIKUS TERDETEKSI PADA CITRA';
+                    yoloBadge.style.background = '#fee2e2'; yoloBadge.style.color = '#dc2626';
+                } else if (yStatus === 'OFF') {
+                    yoloBadge.innerText = 'OFF - TIKUS TIDAK TERDETEKSI PADA CITRA';
+                    yoloBadge.style.background = '#dcfce7'; yoloBadge.style.color = '#16a34a';
+                } else {
+                    yoloBadge.innerText = 'DATA TIDAK TERSEDIA';
+                    yoloBadge.style.background = '#e2e8f0'; yoloBadge.style.color = '#64748b';
+                }
+            }
+
+            // ── UPDATE GAMBAR UTAMA KAMERA (TETAP MENAMPILKAN FALLBACK SAAT KAMERA INAKTIF) ──
             var cw = document.getElementById('cam-content-wrapper');
             if (cw) {
                 if (data.image) {
@@ -464,43 +529,8 @@ function fetchLatestCameraData() {
                 }
             }
 
-            // Update Decision Rule Breakdown
-            var fuzzyVal = parseFloat(data.nilai) || 0;
-            elSet('dr-fuzzy-skor', fuzzyVal.toFixed(4));
-
-            var predBadge = document.getElementById('dr-prediksi-badge');
-            if (predBadge) {
-                var pVal = data.prediksi_sensor || 'RENDAH';
-                if (pVal === 'HAMA') pVal = 'TINGGI';
-                else if (pVal === 'WASPADA') pVal = 'SEDANG';
-                else if (pVal === 'AMAN') pVal = 'RENDAH';
-
-                predBadge.innerText = pVal;
-                if (pVal === 'TINGGI') {
-                    predBadge.style.background = '#fee2e2'; predBadge.style.color = '#dc2626';
-                } else if (pVal === 'SEDANG') {
-                    predBadge.style.background = '#fef9c3'; predBadge.style.color = '#d97706';
-                } else {
-                    predBadge.style.background = '#dcfce7'; predBadge.style.color = '#16a34a';
-                }
-            }
-
-            var yoloBadge = document.getElementById('dr-yolo-badge');
-            if (yoloBadge) {
-                var yStatus = data.hasil_deteksi_yolo || 'OFF';
-                if (yStatus === 'ON') {
-                    yoloBadge.innerText = 'ON - TIKUS TERDETEKSI PADA CITRA';
-                    yoloBadge.style.background = '#fee2e2'; yoloBadge.style.color = '#dc2626';
-                } else {
-                    yoloBadge.innerText = 'OFF - TIKUS TIDAK TERDETEKSI PADA CITRA';
-                    yoloBadge.style.background = '#dcfce7'; yoloBadge.style.color = '#16a34a';
-                }
-            }
-
-            // Update status display (Keputusan Sistem)
+            // ── UPDATE STATUS BESAR ──
             var status = data.keputusan_sistem || data.status;
-
-            // Update status besar
             var panelBesar = document.getElementById('panel-status-besar');
             var sbIcon     = document.getElementById('sb-icon');
             var sbVal      = document.getElementById('sb-val');
@@ -514,21 +544,26 @@ function fetchLatestCameraData() {
                 if (sbVal)  { sbVal.classList.add('hama');    sbVal.innerText = 'HAMA TERDETEKSI'; }
                 if (sbIcon)   sbIcon.innerText = '🚨';
                 if (sbDesc)   sbDesc.innerText = 'Berdasarkan Deteksi Visual YOLO (Kamera). HAMA TIKUS TERDETEKSI PADA CITRA! Segera lakukan tindakan penanganan.';
-            } else if (status === 'TINGGI') {
+            } else if (isSensorOnline && status === 'TINGGI') {
                 if (panelBesar) panelBesar.classList.add('hama');
                 if (sbVal)  { sbVal.classList.add('hama');    sbVal.innerText = 'RISIKO LINGKUNGAN TINGGI'; }
                 if (sbIcon)   sbIcon.innerText = '⚠️';
                 if (sbDesc)   sbDesc.innerText = 'Berdasarkan Analisis Sensor (Fuzzy Sugeno). Tingkat risiko lingkungan TINGGI. Kondisi iklim sangat kondusif bagi perkembangan hama.';
-            } else if (status === 'SEDANG' || status === 'WASPADA') {
+            } else if (isSensorOnline && (status === 'SEDANG' || status === 'WASPADA')) {
                 if (panelBesar) panelBesar.classList.add('waspada');
                 if (sbVal)  { sbVal.classList.add('waspada'); sbVal.innerText = 'RISIKO LINGKUNGAN SEDANG'; }
                 if (sbIcon)   sbIcon.innerText = '⚠️';
                 if (sbDesc)   sbDesc.innerText = 'Berdasarkan Analisis Sensor (Fuzzy Sugeno). Tingkat risiko lingkungan SEDANG. Lakukan pemantauan secara berkala.';
-            } else {
+            } else if (isSensorOnline) {
                 if (panelBesar) panelBesar.classList.add('aman');
                 if (sbVal)  { sbVal.classList.add('aman');    sbVal.innerText = 'RISIKO LINGKUNGAN RENDAH'; }
                 if (sbIcon)   sbIcon.innerText = '🌿';
                 if (sbDesc)   sbDesc.innerText = 'Berdasarkan Analisis Sensor (Fuzzy Sugeno) dan Visual YOLO. Tingkat risiko lingkungan RENDAH. Kondisi aman.';
+            } else {
+                if (panelBesar) panelBesar.classList.add('offline');
+                if (sbVal)  { sbVal.classList.add('offline'); sbVal.innerText = 'ALAT OFFLINE'; }
+                if (sbIcon)   sbIcon.innerText = '📡';
+                if (sbDesc)   sbDesc.innerText = 'Perangkat IoT sedang tidak terhubung. Sensor berada dalam kondisi offline.';
             }
 
             var rekList = document.getElementById('rekomendasi-list');
@@ -550,61 +585,7 @@ function fetchLatestCameraData() {
         })
         .catch(function(err) {
             console.error('Gagal memperbarui data monitor kamera:', err);
-            var riwayatWrapper = document.getElementById('riwayat-foto-wrapper');
-            if (riwayatWrapper && riwayatWrapper.innerHTML.indexOf('Memuat') !== -1) {
-                riwayatWrapper.innerHTML = '<div class="foto-placeholder" style="color:#ef4444;">⚠️ Gagal memuat riwayat foto dari server.</div>';
-            }
         });
-}
-
-function setKameraOffline() {
-
-
-    var headerPill = document.getElementById('header-pill');
-    if (headerPill) headerPill.innerHTML = '<div class="offline-pill">📡 ALAT OFFLINE</div>';
-
-    ['mini-suhu','mini-kel-udara','mini-kel-tanah'].forEach(function(id) {
-        var e = document.getElementById(id); if (e) e.innerText = '--';
-    });
-    ['detail-suhu','detail-kel-udara','detail-kel-tanah','detail-time','dr-fuzzy-skor','dr-yolo-conf'].forEach(function(id) {
-        var e = document.getElementById(id); if (e) e.innerText = '--';
-    });
-
-    var predBadge = document.getElementById('dr-prediksi-badge');
-    if (predBadge) { predBadge.innerText = 'OFFLINE'; predBadge.style.background = '#e2e8f0'; predBadge.style.color = '#64748b'; }
-
-    var yoloBadge = document.getElementById('dr-yolo-badge');
-    if (yoloBadge) { yoloBadge.innerText = 'OFFLINE'; yoloBadge.style.background = '#e2e8f0'; yoloBadge.style.color = '#64748b'; }
-
-    var miniCard = document.getElementById('mini-card-status');
-    var miniVal  = document.getElementById('mini-val-status');
-    var miniFuzzyVal = document.getElementById('mini-fuzzy-val');
-    if (miniCard) miniCard.className = 'card-item status-offline';
-    if (miniVal)  miniVal.innerText  = 'OFFLINE';
-    if (miniFuzzyVal) miniFuzzyVal.innerText = '--';
-
-    var cw = document.getElementById('cam-content-wrapper');
-    if (cw) cw.innerHTML =
-        '<div class="cam-placeholder">' +
-        '  <span class="ph-icon">📡</span>' +
-        '  <span>Alat IoT Tidak Terhubung</span>' +
-        '  <span style="font-size:11px;opacity:0.6;">Gambar akan tampil saat perangkat kembali online</span>' +
-        '</div>';
-
-    var panelBesar = document.getElementById('panel-status-besar');
-    var sbIcon     = document.getElementById('sb-icon');
-    var sbVal      = document.getElementById('sb-val');
-    var sbDesc     = document.getElementById('sb-desc');
-    if (panelBesar) panelBesar.className = 'status-besar offline';
-    if (sbIcon)     sbIcon.innerText     = '📡';
-    if (sbVal)      { sbVal.className    = 'sb-val offline'; sbVal.innerText = 'ALAT OFFLINE'; }
-    if (sbDesc)     sbDesc.innerText     = 'Perangkat IoT sedang tidak terhubung. Periksa koneksi jaringan ESP32.';
-
-    var rekList = document.getElementById('rekomendasi-list');
-    if (rekList) rekList.innerHTML =
-        '<li><span class="aksi-num num-aman">!</span> Periksa koneksi jaringan perangkat IoT.</li>' +
-        '<li><span class="aksi-num num-aman">!</span> Pastikan ESP32 menyala dan terhubung WiFi.</li>' +
-        '<li><span class="aksi-num num-aman">!</span> Pantau kembali setelah perangkat online.</li>';
 }
 
 function elSet(id, val) {
