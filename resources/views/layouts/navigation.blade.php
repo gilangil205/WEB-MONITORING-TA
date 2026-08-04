@@ -39,12 +39,17 @@
                         </x-dropdown-link>-->
 
                         <!-- Authentication -->
-                        <form method="POST" action="{{ route('logout') }}">
+                        <form method="POST" action="{{ route('logout') }}"
+                              class="js-confirm-form"
+                              data-confirm-title="Konfirmasi Keluar"
+                              data-confirm-message="Apakah Anda yakin ingin keluar dari akun ini?"
+                              data-confirm-button="Ya, Keluar"
+                              data-confirm-type="warning">
                             @csrf
 
                             <x-dropdown-link :href="route('logout')"
                                     onclick="event.preventDefault();
-                                                this.closest('form').submit();">
+                                                this.closest('form').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));">
                                 {{ __('Log Out') }}
                             </x-dropdown-link>
                         </form>
@@ -85,12 +90,17 @@
                 </x-responsive-nav-link>
 
                 <!-- Authentication -->
-                <form method="POST" action="{{ route('logout') }}">
+                <form method="POST" action="{{ route('logout') }}"
+                      class="js-confirm-form"
+                      data-confirm-title="Konfirmasi Keluar"
+                      data-confirm-message="Apakah Anda yakin ingin keluar dari akun ini?"
+                      data-confirm-button="Ya, Keluar"
+                      data-confirm-type="warning">
                     @csrf
 
                     <x-responsive-nav-link :href="route('logout')"
                             onclick="event.preventDefault();
-                                        this.closest('form').submit();">
+                                        this.closest('form').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));">
                         {{ __('Log Out') }}
                     </x-responsive-nav-link>
                 </form>

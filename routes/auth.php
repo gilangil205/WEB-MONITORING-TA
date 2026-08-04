@@ -57,3 +57,12 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');
 });
+
+Route::get('logout-success', function (\Illuminate\Http\Request $request) {
+    if (!$request->session()->get('logout_success')) {
+        return redirect()->route('login');
+    }
+    $request->session()->forget('logout_success');
+
+    return view('auth.logout-success');
+})->name('logout.success');

@@ -135,8 +135,10 @@
             {{ $popup['message'] ?? '' }}
         </p>
 
-        <button type="button" class="popup-action-close" onclick="closePopupCard()">
-            Tutup
+        <button type="button"
+                class="popup-action-close"
+                onclick="{{ !empty($popup['redirect_url']) ? "window.location.href='" . $popup['redirect_url'] . "'" : "closePopupCard()" }}">
+            {{ $popup['button_text'] ?? 'Tutup' }}
         </button>
     </div>
 </div>

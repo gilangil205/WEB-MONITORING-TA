@@ -412,7 +412,12 @@
 
     {{-- Tombol Logout --}}
     <div style="margin-top:auto; padding-top:20px;">
-        <form action="{{ route('logout') }}" method="POST">
+        <form action="{{ route('logout') }}" method="POST"
+              class="js-confirm-form"
+              data-confirm-title="Konfirmasi Keluar"
+              data-confirm-message="Apakah Anda yakin ingin keluar dari akun ini?"
+              data-confirm-button="Ya, Keluar"
+              data-confirm-type="warning">
             @csrf
             <button type="submit"
                 style="width:100%; background:#ef4444; color:white; border:none; padding:10px;
