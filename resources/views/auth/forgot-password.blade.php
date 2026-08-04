@@ -193,6 +193,8 @@
 
 <body>
 
+    @include('components.popup-alert')
+
     <div class="left-side">
         <div class="brand">
             <h1>🌽 SmartFarm</h1>
@@ -211,12 +213,6 @@
                     Masukkan email terdaftar Anda. Kami akan mengirimkan tautan untuk mengatur ulang password akun Anda.
                 </p>
             </div>
-
-            @if (session('status'))
-                <div class="status-message">
-                    {{ session('status') }}
-                </div>
-            @endif
 
             <form method="POST" action="{{ route('password.email') }}">
                 @csrf

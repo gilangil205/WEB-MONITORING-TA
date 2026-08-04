@@ -82,6 +82,24 @@
                     $message = $errors->first();
                 }
             }
+        } elseif (request()->routeIs('password.request') || request()->is('forgot-password*')) {
+            $title = 'Permintaan Gagal';
+            $emailErr = $errors->first('email');
+            if ($emailErr && (str_contains(strtolower($emailErr), 'format') || str_contains(strtolower($emailErr), 'valid'))) {
+                $message = 'Masukkan alamat email dengan format yang benar.';
+            } elseif ($errors->has('email')) {
+                $message = 'Email wajib diisi.';
+            } else {
+                $message = $errors->first();
+            }
+        } elseif (request()->routeIs('password.reset') || request()->is('reset-password*')) {
+            $title = 'Reset Password Gagal';
+            $passErr = $errors->first('password');
+            if ($passErr && (str_contains(strtolower($passErr), 'confirmation') || str_contains(strtolower($passErr), 'konfirmasi') || str_contains(strtolower($passErr), 'same') || str_contains(strtolower($passErr), 'match'))) {
+                $message = 'Password baru dan konfirmasi password harus sama.';
+            } else {
+                $message = $errors->first();
+            }
         }
 
         $popup = [

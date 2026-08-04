@@ -212,6 +212,8 @@
 
 <body>
 
+    @include('components.popup-alert')
+
     <div class="left-side">
         <div class="brand">
             <h1>🌽 SmartFarm</h1>

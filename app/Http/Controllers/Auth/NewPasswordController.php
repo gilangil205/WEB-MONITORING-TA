@@ -31,15 +31,39 @@ class NewPasswordController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $request->validate([
-            'token' => ['required'],
-            'email' => ['required', 'email'],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
-        ]);
+        try {
+            $request->validate([
+                'token'    => ['required'],
+                'email'    => ['required', 'email'],
+                'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            ]);
+        } catch (ValidationException $e) {
+            $passErrors = $e->errors()['password'] ?? [];
+            $hasConfirmationErr = false;
+            foreach ($passErrors as $err) {
+                if (str_contains(strtolower($err), 'confirmation') || str_contains(strtolower($err), 'konfirmasi') || str_contains(strtolower($err), 'same') || str_contains(strtolower($err), 'match')) {
+                    $hasConfirmationErr = true;
+                    break;
+                }
+            }
 
-        // Here we will attempt to reset the user's password. If it is successful we
-        // will update the password on an actual user model and persist it to the
-        // database. Otherwise we will parse the error and return the response.
+            if ($hasConfirmationErr) {
+                session()->flash('popup', [
+                    'type'    => 'error',
+                    'title'   => 'Reset Password Gagal',
+                    'message' => 'Password baru dan konfirmasi password harus sama.',
+                ]);
+            } else {
+                session()->flash('popup', [
+                    'type'    => 'error',
+                    'title'   => 'Reset Password Gagal',
+                    'message' => $e->validator->errors()->first(),
+                ]);
+            }
+
+            throw $e;
+        }
+
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function (User $user) use ($request) {
@@ -52,12 +76,30 @@ class NewPasswordController extends Controller
             }
         );
 
-        // If the password was successfully reset, we will redirect the user back to
-        // the application's home authenticated view. If there is an error we can
-        // redirect them back to where they came from with their error message.
-        return $status == Password::PASSWORD_RESET
-                    ? redirect()->route('login')->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+        if ($status === Password::PASSWORD_RESET) {
+            session()->flash('popup', [
+                'type'    => 'success',
+                'title'   => 'Reset Password Berhasil',
+                'message' => 'Password berhasil diperbarui. Silakan masuk menggunakan password baru.',
+            ]);
+
+            return redirect()->route('login');
+        }
+
+        $errorTitle = 'Reset Password Gagal';
+        $errorMessage = 'Data pengaturan ulang password tidak valid.';
+
+        if ($status === Password::INVALID_TOKEN || $status === Password::INVALID_USER) {
+            $errorTitle = 'Tautan Tidak Valid';
+            $errorMessage = 'Tautan pengaturan ulang password tidak valid. Silakan kirim permintaan reset password kembali.';
+        }
+
+        session()->flash('popup', [
+            'type'    => 'error',
+            'title'   => $errorTitle,
+            'message' => $errorMessage,
+        ]);
+
+        return back()->withInput($request->only('email'));
     }
 }
