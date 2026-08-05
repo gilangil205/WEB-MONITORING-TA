@@ -69,21 +69,38 @@ class MQTTSubscribe extends Command
                             $nilai_fuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);
                             [$deteksi]   = $this->getStatus($nilai_fuzzy);
 
-                            // ── BACA CACHE YOLO (Integrasi Decision Rule) ──
+                            // ── BACA CACHE YOLO (Integrasi Decision Rule dengan Freshness Check) ──
                             $inputDeteksiYolo = null;
                             $inputConfidenceYolo = null;
-                            $hasilDeteksiYolo = 'OFF';
+                            $hasilDeteksiYolo = 'DATA TIDAK TERSEDIA';
 
-                            if (Cache::has('yolo_live_data')) {
-                            $yolo = Cache::get('yolo_live_data');
-                            $inputDeteksiYolo = $yolo['deteksi_yolo'] ?? null;
-                            $inputConfidenceYolo = $yolo['confidence_yolo'] ?? null;
-                            $hasilDeteksiYolo = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
-                        }
+                            $latestYoloUpdatedAt = Cache::get('latest_yolo_updated_at');
+                            if (!$latestYoloUpdatedAt && Cache::has('yolo_live_data')) {
+                                $yoloData = Cache::get('yolo_live_data');
+                                $latestYoloUpdatedAt = $yoloData['updated_at'] ?? null;
+                            }
 
-                        // Keputusan Sistem
-                        $controller = app(\App\Http\Controllers\SensorController::class);
-                        $keputusanSistem = $controller->getSystemDecision($hasilDeteksiYolo, $deteksi);
+                            $isYoloFresh = false;
+                            if ($latestYoloUpdatedAt) {
+                                try {
+                                    $parsedTime = \Carbon\Carbon::parse($latestYoloUpdatedAt);
+                                    $isYoloFresh = $parsedTime->diffInMinutes(now()) <= SensorController::CAMERA_EXPIRATION_MINUTES;
+                                } catch (\Throwable $e) {
+                                    $isYoloFresh = false;
+                                    Log::warning("MQTTSubscribe: Timestamp YOLO tidak valid [{$latestYoloUpdatedAt}]: " . $e->getMessage());
+                                }
+                            }
+
+                            if ($isYoloFresh && Cache::has('yolo_live_data')) {
+                                $yolo = Cache::get('yolo_live_data');
+                                $inputDeteksiYolo = $yolo['deteksi_yolo'] ?? null;
+                                $inputConfidenceYolo = $yolo['confidence_yolo'] ?? null;
+                                $hasilDeteksiYolo = $yolo['hasil_deteksi_yolo'] ?? 'OFF';
+                            }
+
+                            // Keputusan Sistem Terpusat
+                            $controller = app(\App\Http\Controllers\SensorController::class);
+                            $keputusanSistem = $controller->getSystemDecision($hasilDeteksiYolo, $deteksi);
 
                         $this->info(sprintf(
                             'Fuzzy server-side → suhu:%.1f udara:%.1f tanah:%.1f → nilai:%.4f status:%s',
