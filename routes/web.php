@@ -17,7 +17,6 @@ Route::middleware(['auth', 'verified', 'user'])->group(function () {
     Route::get('/riwayat',    [SensorController::class, 'riwayat'])->name('riwayat');
     Route::get('/kamera',     [SensorController::class, 'kamera'])->name('kamera');
     Route::get('/live-data',  [SensorController::class, 'liveData'])->name('live-data');
-    Route::post('/manual',    [SensorController::class, 'manual'])->name('manual');
 
     Route::prefix('notifications')->name('notifications.')->group(function () {
         Route::get('/', [NotificationController::class, 'index'])->name('index');

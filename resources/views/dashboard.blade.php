@@ -147,13 +147,7 @@
 
 </div>
 
-{{-- ── TOMBOL MANUAL ── --}}
-<form action="{{ route('manual') }}" method="POST" style="display:inline;">
-    @csrf
-    <button type="submit" class="btn-manual">
-        🔄 Ambil Data Manual (Simulasi IoT)
-    </button>
-</form>
+
 
 {{-- ── GRAFIK SENSOR + ANALISIS FUZZY ── --}}
 <style>

@@ -126,9 +126,7 @@
         .status-medium { background:#facc15; color:#713f12; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:600; }
         .status-low    { background:#22c55e; color:white; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:600; }
 
-        /* ── TOMBOL MANUAL ── */
-        .btn-manual { display:inline-flex; align-items:center; gap:8px; background:linear-gradient(135deg,#16a34a,#15803d); color:white; border:none; padding:10px 20px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600; font-family:var(--font); box-shadow:0 4px 12px rgba(22,163,74,0.35); transition:all 0.2s; margin-bottom:20px; }
-        .btn-manual:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(22,163,74,0.45); }
+
 
         /* ── GRID LAYOUT ── */
         .content-grid  { display:grid; grid-template-columns:2fr 1fr; gap:18px; margin-bottom:18px; }

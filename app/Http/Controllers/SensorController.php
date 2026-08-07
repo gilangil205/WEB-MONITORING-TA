@@ -616,49 +616,7 @@ class SensorController extends Controller
         ], $isStored ? 201 : 200);
     }
 
-    // ================== MANUAL ==================
-    public function manual()
-    {
-        if (Cache::has('iot_live_data')) {
-            $cache = Cache::get('iot_live_data');
-            $suhu  = $cache['suhu'] ?? 0;
-            $udara = $cache['kelembapan_udara'] ?? 0;
-            $tanah = $cache['kelembapan_tanah'] ?? 0;
-        } else {
-            $latest = SensorReading::latest()->first();
-            if ($latest) {
-                $suhu  = $latest->suhu;
-                $udara = $latest->kelembapan_udara;
-                $tanah = $latest->kelembapan_tanah;
-            } else {
-                return redirect()->route('dashboard')
-                    ->with('error', '❌ Belum ada data sensor. Tunggu kiriman data dari IoT atau gunakan mode simulasi.');
-            }
-        }
 
-        $nilaiFuzzy = $this->fuzzySugeno($suhu, $udara, $tanah);
-        
-        // 1. Prediksi Sensor dari Fuzzy Sugeno
-        [$prediksiSensor] = $this->getStatus($nilaiFuzzy);
-
-        // 2. Hasil Deteksi YOLO (Manual = OFF)
-        $hasilDeteksiYolo = 'OFF';
-
-        // 3. Keputusan Sistem (Sesuai Tabel Decision Rule)
-        $keputusanSistem = $this->getSystemDecision($hasilDeteksiYolo, $prediksiSensor);
-
-        $sensor = SensorReading::create([
-            'suhu'             => $suhu,
-            'kelembapan_udara' => $udara,
-            'kelembapan_tanah' => $tanah,
-            'nilai_fuzzy'      => $nilaiFuzzy,
-            'deteksi'          => $keputusanSistem,
-        ]);
-
-        // Simulasi manual admin memperbarui database tanpa memicu notifikasi berulang
-        return redirect()->route('dashboard')
-            ->with('success', '✅ Data real-time berhasil disimpan ke database!');
-    }
 
     // ==================================================================================
     // FUZZY SUGENO (UNCHANGED - Already Correct)
@@ -892,25 +850,41 @@ class SensorController extends Controller
         $statusGlobal = $this->getStatusGlobal();
         view()->share('statusGlobal', $statusGlobal);
 
-        $isOnline    = Cache::has('iot_live_data');
-        $latest      = SensorReading::latest()->first();
-        $data        = SensorReading::latest()->take(10)->get()->reverse()->values();
+        $isOnline = Cache::has('iot_live_data');
+
+        // Query HANYA data historis sensor periodik (mengabaikan record kejadian HAMA YOLO instan OFF->ON)
+        $periodicQuery = SensorReading::where(function ($q) {
+            $q->whereNull('deteksi_yolo')->orWhere('deteksi_yolo', 'OFF');
+        });
+
+        $latest = (clone $periodicQuery)->orderBy('created_at', 'desc')->orderBy('id', 'desc')->first() ?: SensorReading::latest()->first();
+
+        // Ambil maksimal 10 data sensor periodik terbaru, kemudian urutkan secara kronologis (lama -> baru)
+        $data = (clone $periodicQuery)->orderBy('created_at', 'desc')->orderBy('id', 'desc')->take(10)->get()->reverse()->values();
+
         $fuzzyValues = $data->map(fn($d) => $this->resolveFuzzyValue($d))->values()->toArray();
         $nilai       = count($fuzzyValues) ? end($fuzzyValues) : 0;
         [$status, $class] = $this->getStatus($nilai);
 
+        // Hitung rata-rata perubahan nilai Fuzzy Sugeno per interval 15 menit
+        // Menggunakan nomor slot 15 menit berdasarkan Unix timestamp agar gap dari slot kosong
+        // (perangkat offline / subscriber tidak aktif) tidak salah dihitung sebagai satu interval.
         $diff = 0;
         if (count($fuzzyValues) > 1) {
-            $totalDiff = 0;
-            for ($i = 1; $i < count($fuzzyValues); $i++) {
-                $totalDiff += ($fuzzyValues[$i] - $fuzzyValues[$i - 1]);
-            }
-            $diff = $totalDiff / (count($fuzzyValues) - 1);
+            $firstTime  = $data->first()->created_at;
+            $lastTime   = $data->last()->created_at;
+            $firstSlot  = intdiv($firstTime->timestamp, 15 * 60);
+            $lastSlot   = intdiv($lastTime->timestamp, 15 * 60);
+            $intervals  = max(1, $lastSlot - $firstSlot);
+
+            $totalChange = end($fuzzyValues) - reset($fuzzyValues);
+            $diff = $totalChange / $intervals;
         }
 
+        // Proyeksi 3 periode (15m, 30m, dan 45m berikutnya), nilai dibatasi pada rentang 0-1
         $prediksi = $prediksiStatus = [];
         for ($i = 1; $i <= 3; $i++) {
-            $next = max(0, min(1, $nilai + $diff * $i));
+            $next = max(0.0, min(1.0, $nilai + $diff * $i));
             $prediksi[] = round($next, 3);
             [$ps] = $this->getStatus($next);
             $prediksiStatus[] = $ps;
